@@ -7,7 +7,65 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-import scipy.signal as ss
+
+
+def simulateCultures(param, cb_fc_ec, cb_hrs, cb_od, cb_tem):
+    """
+    Simulates one E coli. and P. Putida coculture using Euler forward discretization.
+
+    Returns a time array with the corresponding values of the temperature and simulated population sizes.
+    """
+
+    Init_e = cb_fc_ec[0]*cb_od[0]/100
+    Init_p = (100-cb_fc_ec[0])*cb_od[0]/100
+
+    sim_h = cb_hrs[-1]-cb_hrs[0]
+    data_l = int(sim_h*3600/param.Ts)
+
+    sim_hrs = np.empty(data_l)
+    e_coli = BactCult("e", Init_e)
+    p_puti = BactCult("p", Init_p)
+
+    temp_arr_e = np.full(data_l+param.Lag_ind,param.T_pre_e,'float')
+    temp_arr_p = np.full(data_l+param.Lag_ind,param.T_pre_p,'float')
+    temp_arr_e_in = np.empty(data_l)
+    temp_arr_p_in = np.empty(data_l)
+    count = 0
+    e_coli_arr = np.empty(data_l)
+    p_puti_arr = np.empty(data_l)
+
+    # Update
+    for i in range(data_l):
+        # log
+        sim_hrs[i] = i*param.Ts/3600
+        e_coli_arr[i] = e_coli.pop
+        p_puti_arr[i] = p_puti.pop
+
+        pop_e = e_coli.pop
+        pop_p = p_puti.pop
+
+        # Dilute if combined OD above threshold
+        if (pop_e + pop_p > param.Dil_th):
+            e_coli.dilute(pop_p)
+            p_puti.dilute(pop_e)
+            
+        # Let them grow
+        i_lag = i+param.Lag_ind
+        if cb_hrs[count] <= sim_hrs[i]:
+            count += 1
+        temp_arr_e[i_lag] = cb_tem[count-1]
+        temp_arr_p[i_lag] = cb_tem[count-1]
+        if (param.Avg_temp and param.Lag):
+            temp_arr_e_in[i] = np.average(temp_arr_e[i+1:i+param.Lag_ind+1])
+            temp_arr_p_in[i] = np.average(temp_arr_p[i+1:i+param.Lag_ind+1])
+        else:
+            temp_arr_e_in[i] = temp_arr_e[i]
+            temp_arr_p_in[i] = temp_arr_p[i]
+        e_coli.grow(temp_arr_e_in[i])
+        p_puti.grow(temp_arr_p_in[i])
+    
+    return temp_arr_e_in, sim_hrs, e_coli_arr, p_puti_arr
+
 
 def interpolateCbToSim(cb_hrs, cb_data, sim_hrs):
     count = 0
@@ -17,45 +75,6 @@ def interpolateCbToSim(cb_hrs, cb_data, sim_hrs):
             count += 1
         sim_data[i] = cb_data[count-1]
     return sim_data
-
-def simulateCultures(e_init, p_init, sim_tem_e, sim_tem_p):
-    """
-    Simulates one E coli. and P. Putida coculture using Euler forward discretization.
-
-    Returns a time array with the corresponding values of the temperature and simulated population sizes.
-    """
-    e_coli = BactCult("e", e_init)
-    p_puti = BactCult("p", p_init)
-
-    data_l = len(sim_tem_e)
-
-    sim_pop_e = np.empty(data_l)
-    sim_pop_p = np.empty(data_l)
-    sim_dil = np.empty(data_l)
-
-    # Update
-    for i in range(data_l):
-        # log
-        sim_pop_e[i] = e_coli.pop
-        sim_pop_p[i] = p_puti.pop
-
-        pop_e = e_coli.pop
-        pop_p = p_puti.pop
-        dil = 0
-
-        # Dilute if combined OD above threshold
-        if (pop_e + pop_p > param.Dil_th):
-            e_coli.dilute(pop_p)
-            p_puti.dilute(pop_e)
-            dil = 1
-
-        sim_dil[i] = dil
-            
-        # Let them grow
-        e_coli.grow(sim_tem_e[i])
-        p_puti.grow(sim_tem_p[i])
-    
-    return sim_pop_e, sim_pop_p, sim_dil
 
 
 def simulateFlProtein(flp_init, p_puti, temp, dil):
@@ -107,29 +126,16 @@ if __name__ == "__main__":
 
     param = Param()
 
-    sim_tem_e, sim_tem_p, sim_hrs, e_coli_all, p_puti_all = [], [], [], [], []
+    temp_arr_e_in_all, time_all, e_coli_all, p_puti_all = [], [], [], []
     fl_p_all = []
     # SIMULATION
     for j in range(n_reactors):
-        sim_hrs.append(np.arange(0,cb_hrs[j][-1]-cb_hrs[j][0],param.Ts/3600))
-        sim_tem = interpolateCbToSim(cb_hrs[j], cb_tem[j], sim_hrs[j])
-        e_init = cb_fc_ec[j][0]*cb_od[j][0]/100
-        p_init = (100-cb_fc_ec[j][0])*cb_od[j][0]/100
-        if (param.Lag):
-            tem_lag_e = np.concatenate((np.full(param.Lag_ind,param.T_pre_e),sim_tem))
-            tem_lag_p = np.concatenate((np.full(param.Lag_ind,param.T_pre_p),sim_tem))
-            if param.Avg_temp:
-                sim_tem_e.append(ss.convolve(tem_lag_e,np.full(param.Lag_ind+1,1/(param.Lag_ind+1)),mode='valid'))
-                sim_tem_p.append(ss.convolve(tem_lag_p,np.full(param.Lag_ind+1,1/(param.Lag_ind+1)),mode='valid'))
-            else:
-                sim_tem_e.append(tem_lag_e[:len(sim_hrs[j])])
-                sim_tem_p.append(tem_lag_p[:len(sim_hrs[j])])
-        else:
-            sim_tem_e.append(sim_tem)
-            sim_tem_p.append(sim_tem)
-        sim_pop_e, sim_pop_p, sim_dil = simulateCultures(e_init, p_init, sim_tem_e[j], sim_tem_p[j])
-        e_coli_all.append(sim_pop_e)
-        p_puti_all.append(sim_pop_p)
+        # TODO: include reactor fluorescense offsets
+        temp_arr_e_in, sim_hrs, e_coli_arr, p_puti_arr = simulateCultures(param, cb_fc_ec[j], cb_hrs[j], cb_od[j], cb_tem[j])
+        temp_arr_e_in_all.append(temp_arr_e_in)
+        time_all.append(sim_hrs)
+        e_coli_all.append(e_coli_arr)
+        p_puti_all.append(p_puti_arr)
 
 
 
@@ -153,10 +159,10 @@ if __name__ == "__main__":
         ax[j].patch.set_visible(False)
 
         axr.plot(cb_hrs[j],cb_tem[j],'--r',lw=0.5,alpha=0.4)
-        axr.plot(sim_hrs[j],sim_tem_e[j],'r',lw=1)
-        axr.hlines(critTemp[0],sim_hrs[j][0]-1,sim_hrs[j][-1]+1,'r',lw=0.5)
-        ax[j].plot(sim_hrs[j],e_coli_percent, 'b', label = 'e coli. sim')
-        ax[j].plot(sim_hrs[j],p_puti_percent, 'g', label = 'p. putida sim')
+        axr.plot(time_all[j],temp_arr_e_in_all[j],'r',lw=1)
+        axr.hlines(critTemp[0],time_all[j][0]-1,time_all[j][-1]+1,'r',lw=0.5)
+        ax[j].plot(time_all[j],e_coli_percent, 'b', label = 'e coli. sim')
+        ax[j].plot(time_all[j],p_puti_percent, 'g', label = 'p. putida sim')
         ax[j].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],cb_fc_ec[j], 'b--x', label = 'e coli. fc')
         ax[j].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],100-cb_fc_ec[j], 'g--x', label = 'p. putida fc')
         ax[j].plot(cb_hrs[j],(cb_fl[j]-min_fl[j])/(max_fl[j]-min_fl[j])*100,'.k',markersize = 0.8, label = '% max fluorescense')
@@ -184,13 +190,13 @@ if __name__ == "__main__":
                 color='w',
                 bbox={'facecolor': 'red', 'alpha': 1, 'pad': 0, 'edgecolor': 'r'})
         ax[j].set_xlabel("Time [h]")
-        ax[j].set_xlim([sim_hrs[j][0]-0.5,sim_hrs[j][-1]+0.5])
+        ax[j].set_xlim([time_all[j][0]-0.5,time_all[j][-1]+0.5])
         ax[j].set_ylim([-5,105])
     # TODO: Set titles
     ax[0].set_title("C8M2")
     ax[1].set_title("C8M3")
     fig.suptitle("064-1")
     fig.tight_layout()
-    fig.savefig("Images/064-1_lag_3h_avg_fl_new.png")
+    fig.savefig("Images/064-1_lag_3h_avg_fl_tem.png")
     # fig.savefig("Images/064-1_fl.png")
     # plt.show()
