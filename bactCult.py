@@ -41,8 +41,8 @@ class FlProtein:
         """
         self.count = self.count + self.param.Ts/3600*getGrowthRate(self.type, T)*pop_p
         
-    def dilute(self):
+    def dilute(self, dil_am, dil_th):
         """
         Take self.dil_am out of the reactor and update self.count correspondingly.
         """
-        self.count -= self.param.Dil_amount/self.param.Dil_th*self.count
+        self.count -= dil_am/dil_th*self.count

@@ -9,13 +9,20 @@ import matplotlib.pyplot as plt
 import math
 import scipy.signal as ss
 
-def interpolateCbToSim(cb_hrs, cb_data, sim_hrs):
+def interpolateCbToSim(cb_hrs, cb_data, sim_hrs, method='hold'):
     count = 0
     sim_data = np.empty_like(sim_hrs)
+    if method == 'zero':
+        sim_data = np.zeros(len(sim_hrs),dtype=int)
     for i in range(len(sim_hrs)):
         if cb_hrs[count] <= sim_hrs[i]:
             count += 1
-        sim_data[i] = cb_data[count-1]
+            sim_data[i] = cb_data[count-1]
+        else:
+            if method == 'hold':
+                sim_data[i] = cb_data[count-1]
+            elif method == 'zero':
+                sim_data[i] = 0
     return sim_data
 
 def simulateCultures(e_init, p_init, sim_tem_e, sim_tem_p):
@@ -58,20 +65,40 @@ def simulateCultures(e_init, p_init, sim_tem_e, sim_tem_p):
     return sim_pop_e, sim_pop_p, sim_dil
 
 
-def simulateFlProtein(flp_init, p_puti, temp, dil):
+def simulateFlProtein(flp_init, p_puti, temp, dil, dil_am ,dil_th):
     fl_arr = np.empty_like(p_puti)
     fl_p = FlProtein(flp_init)
     for i in range(len(p_puti)):
         fl_arr[i] = fl_p.count
         fl_p.produce(p_puti[i],temp[i])
         if dil[i]:
-            fl_p.dilute()
+            fl_p.dilute(dil_am, dil_th)
     return fl_arr
+
+
+def loadData(path, file_ind, scope, n_reactors):
+    cb_files = sorted(glob.glob(path + "/*.csv"))
+    cb_dfs = []
+    for i in file_ind:
+        df = pd.read_csv(cb_files[i], index_col=None, header=0)
+        cb_dfs.append(df)
+
+    cb_hrs, cb_od, cb_tem, cb_fl, cb_p1 = [], [], [], [], []
+    for i in range(n_reactors):
+        cb_hrs.append(cb_dfs[i]["exp_time"][scope[i][0]:scope[i][-1]+1].to_numpy()/3600)
+        cb_od_temp = cb_dfs[i]["od_measured"][scope[i][0]:scope[i][-1]+1].to_numpy()
+        cb_od_temp[cb_od_temp < 0.005] = 0.005
+        cb_od.append(cb_od_temp)
+        cb_tem.append(cb_dfs[i]["media_temp"][scope[i][0]:scope[i][-1]+1].to_numpy())
+        cb_fl.append(cb_dfs[i]["FP1_emit1"][scope[i][0]:scope[i][-1]+1].to_numpy())
+        cb_p1.append(cb_dfs[i]["pump_1_rate"][scope[i][0]:scope[i][-1]+1].to_numpy())
+    cb_hrs = [cb_hrs[i]-cb_hrs[i][0] for i in range(n_reactors)]
+    return cb_hrs, cb_od, cb_tem, cb_fl, cb_p1
 
 
 if __name__ == "__main__":
 
-    # LOAD DATA
+    # SPECIFY DATA
     # TODO: Add path to chiBio data directory
     path = '../../Ting/Experiments/064-1'
     # TODO: Add indeces of files of interest
@@ -88,22 +115,10 @@ if __name__ == "__main__":
                          FC_data[5::4].to_numpy()])
     # TODO: Adapt min/max fluorescense values of the respective reactors
     min_fl = [0.061, 0.059]
-    max_fl = [0.285, 0.290]
+    # max_fl = [0.285, 0.290]
 
-    cb_files = sorted(glob.glob(path + "/*.csv"))
-    cb_dfs = []
-    for i in file_ind:
-        df = pd.read_csv(cb_files[i], index_col=None, header=0)
-        cb_dfs.append(df)
     n_reactors = len(file_ind)
-
-    cb_hrs, cb_od, cb_tem, cb_fl = [], [], [], []
-    for i in range(n_reactors):
-        cb_hrs.append(cb_dfs[i]["exp_time"][sampcycle[i][0]:sampcycle[i][-1]+1].to_numpy()/3600)
-        cb_od.append(cb_dfs[i]["od_measured"][sampcycle[i][0]:sampcycle[i][-1]+1].to_numpy())
-        cb_tem.append(cb_dfs[i]["media_temp"][sampcycle[i][0]:sampcycle[i][-1]+1].to_numpy())
-        cb_fl.append(cb_dfs[i]["FP1_emit1"][sampcycle[i][0]:sampcycle[i][-1]+1].to_numpy())
-    cb_hrs = [cb_hrs[i]-cb_hrs[i][0] for i in range(n_reactors)]
+    cb_hrs, cb_od, cb_tem, cb_fl, cb_p1 = loadData(path, file_ind, sampcycle, n_reactors)
 
     param = Param()
 
@@ -111,6 +126,7 @@ if __name__ == "__main__":
     fl_p_all = []
     # SIMULATION
     for j in range(n_reactors):
+        # Collect inputs
         sim_hrs.append(np.arange(0,cb_hrs[j][-1]-cb_hrs[j][0],param.Ts/3600))
         sim_tem = interpolateCbToSim(cb_hrs[j], cb_tem[j], sim_hrs[j])
         e_init = cb_fc_ec[j][0]*cb_od[j][0]/100
@@ -127,13 +143,16 @@ if __name__ == "__main__":
         else:
             sim_tem_e.append(sim_tem)
             sim_tem_p.append(sim_tem)
+        # Simulate cultures
         sim_pop_e, sim_pop_p, sim_dil = simulateCultures(e_init, p_init, sim_tem_e[j], sim_tem_p[j])
         e_coli_all.append(sim_pop_e)
         p_puti_all.append(sim_pop_p)
+        fl_init = (cb_fl[j][0] - min_fl[j])*cb_od[j][0]
+        sim_od = interpolateCbToSim(cb_hrs[j], cb_od[j], sim_hrs[j])
+        fl_p_all.append(simulateFlProtein(fl_init, sim_pop_p, sim_tem, sim_dil, param.Dil_amount, param.Dil_th)/sim_od)
 
 
-
-    gR.plotGrowthRates()
+    # gR.plotGrowthRates()
     critTemp = gR.getCritTemp()
     assert(26 < critTemp[0] and critTemp[0] < 37)
 
@@ -159,11 +178,12 @@ if __name__ == "__main__":
         ax[j].plot(sim_hrs[j],p_puti_percent, 'g', label = 'p. putida sim')
         ax[j].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],cb_fc_ec[j], 'b--x', label = 'e coli. fc')
         ax[j].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],100-cb_fc_ec[j], 'g--x', label = 'p. putida fc')
-        ax[j].plot(cb_hrs[j],(cb_fl[j]-min_fl[j])/(max_fl[j]-min_fl[j])*100,'.k',markersize = 0.8, label = '% max fluorescense')
+        ax[j].plot(cb_hrs[j],cb_fl[j]*100,'.k',markersize = 0.8, label = '$100*fl$')
+        ax[j].plot(sim_hrs[j],(fl_p_all[j]+min_fl[j])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
         # ax[j].plot(time_all[j],od*100,'-k',lw = 0.5, label = 'od sim')
         # ax[j].plot(cb_hrs[j],cb_od[j]*100,'--m',lw = 0.5, label = 'od')
 
-        ax[j].legend(loc="lower left")
+        ax[j].legend(loc="upper left")
         if (j%2 == 0):
             ax[j].set_ylabel("Relative composition [%]")
         else:
@@ -191,6 +211,6 @@ if __name__ == "__main__":
     ax[1].set_title("C8M3")
     fig.suptitle("064-1")
     fig.tight_layout()
-    fig.savefig("Images/064-1_lag_3h_avg_fl_new.png")
+    fig.savefig("Images/064-1_lag_3_h_avg_fl_new.svg")
     # fig.savefig("Images/064-1_fl.png")
     # plt.show()

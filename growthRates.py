@@ -13,11 +13,31 @@ def getGrowthRate(bact, temp):
         case "p":
             gr = param.Del_p*temp**3 + param.Gam_p*temp**2 + param.Beta_p*temp + param.Alpha_p
         case "f":
-            gr = param.Gam_f*temp**2 + param.Beta_f*temp + param.Alpha_f
+            beta_f = (param.c_sl - param.c_sh)/(param.T_sl - param.T_sh)
+            alpha_f = param.c_sl - beta_f*param.T_sl
+            gr = beta_f*temp + alpha_f
             if gr.size > 1:
-                gr[gr<0.2] = 0.2
+                gr[gr<param.c_sh] = param.c_sh
+                gr[gr>param.c_sl] = param.c_sl
             else:
-                gr = max(0.2, gr)
+                gr = max(param.c_sh, gr)
+                gr = min(param.c_sl, gr)
+            # if temp == 26:
+            #     gr = 0.15
+            # elif temp == 27:
+            #     gr = 0.17
+            # elif temp == 29:
+            #     gr = 0.15
+            # elif temp == 30:
+            #     gr = 0.17
+            # elif temp == 31:
+            #     gr = 0.18
+            # elif temp == 33:
+            #     gr = 0.15
+            # elif temp == 35:
+            #     gr = 0.002
+            # elif temp == 37:
+            #     gr = 0.002
         case _:
             raise Exception('bact should be e or p. The value of bact was: {}'.format(bact))
     return gr

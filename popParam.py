@@ -11,8 +11,8 @@ class Param:
         self.T_pre_e = 37
         self.T_pre_p = 26
 
-        self.Avg_temp = False
-        self.Lag = 0 # hours
+        self.Avg_temp = True
+        self.Lag = 3 # hours
         self.Lag_ind = int(self.Lag*3600/self.Ts) # Lag in indeces
 
         # TODO: Adapt min/max fluorescense values of the respective reactors
@@ -33,10 +33,12 @@ class Param:
 
         # Quadratic model for fluorescent protein dynamcs
         self.Gam_f =  0
-        self.Beta_f = -0.1
-        self.Alpha_f = 3.6
-        self.m = 1
-        self.c = 0
+        self.Beta_f = -0.1# -0.1
+        self.Alpha_f = 3# 3.6
+        self.T_sl = 33
+        self.c_sl = 0.16
+        self.T_sh = 35
+        self.c_sh = 0.005
 
         # TODO: Add fluorescense growth parameters
 
