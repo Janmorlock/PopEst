@@ -1,4 +1,4 @@
-from popParam import Param
+from popParam import ModParam, getCbDataInfo, getFcData
 from bactCult import BactCult, FlProtein
 import growthRates as gR
 
@@ -99,28 +99,15 @@ def loadData(path, file_ind, scope, n_reactors):
 if __name__ == "__main__":
 
     # SPECIFY DATA
-    # TODO: Add path to chiBio data directory
-    path = '../../Ting/Experiments/064-1'
-    # TODO: Add indeces of files of interest
-    file_ind = [3, 5]
-    # TODO: Add sampcycle indices as in Matlab
-    sampcycle = np.array([[1004, 1140, 1262, 1376, 1505, 1637, 1760, 2487],
-                          [2, 138, 260, 374, 502, 636, 759, 1486]])
-    sampcycle -= 1 # adapts indeces to python
-    # TODO: Add excel with flow cytometry data
-    FC_file = pd.read_excel('../../Ting/Experiments/064-1/231016 Facility Analysis Manual Count.xlsx',header=[1])
-    FC_data = FC_file['% Parent.1'] + FC_file['% Parent.2']
-    # TODO: Add indeces
-    cb_fc_ec = np.array([FC_data[4::4].to_numpy(),
-                         FC_data[5::4].to_numpy()])
-    # TODO: Adapt min/max fluorescense values of the respective reactors
-    min_fl = [0.061, 0.059]
-    # max_fl = [0.285, 0.290]
+    dataName = '064-2'
+    path, file_ind, sampcycle = getCbDataInfo(dataName)
+    cb_fc_ec = getFcData(dataName)
+    # min_fl = [0.061, 0.059]
 
     n_reactors = len(file_ind)
     cb_hrs, cb_od, cb_tem, cb_fl, cb_p1 = loadData(path, file_ind, sampcycle, n_reactors)
 
-    param = Param()
+    param = ModParam()
 
     sim_tem_e, sim_tem_p, sim_hrs, e_coli_all, p_puti_all = [], [], [], [], []
     fl_p_all = []
@@ -147,7 +134,7 @@ if __name__ == "__main__":
         sim_pop_e, sim_pop_p, sim_dil = simulateCultures(e_init, p_init, sim_tem_e[j], sim_tem_p[j])
         e_coli_all.append(sim_pop_e)
         p_puti_all.append(sim_pop_p)
-        fl_init = (cb_fl[j][0] - min_fl[j])*cb_od[j][0]
+        fl_init = (cb_fl[j][0] - param.min_fl[file_ind[j]])*cb_od[j][0]
         sim_od = interpolateCbToSim(cb_hrs[j], cb_od[j], sim_hrs[j])
         fl_p_all.append(simulateFlProtein(fl_init, sim_pop_p, sim_tem, sim_dil, param.Dil_amount, param.Dil_th)/sim_od)
 
@@ -162,33 +149,35 @@ if __name__ == "__main__":
     fig.set_figheight(n_rows*7)
     fig.set_figwidth(20)
     for j in range(n_reactors):
+        r = j//2
+        c = j%2
         od = e_coli_all[j] + p_puti_all[j]
         e_coli_percent = e_coli_all[j]/od*100
         p_puti_percent = p_puti_all[j]/od*100
 
-        axr = ax[j].twinx()
-        ax[j].set_zorder(2)
+        axr = ax[r][c].twinx()
+        ax[r][c].set_zorder(2)
         axr.set_zorder(1)
-        ax[j].patch.set_visible(False)
+        ax[r][c].patch.set_visible(False)
 
         axr.plot(cb_hrs[j],cb_tem[j],'--r',lw=0.5,alpha=0.4)
         axr.plot(sim_hrs[j],sim_tem_e[j],'r',lw=1)
         axr.hlines(critTemp[0],sim_hrs[j][0]-1,sim_hrs[j][-1]+1,'r',lw=0.5)
-        ax[j].plot(sim_hrs[j],e_coli_percent, 'b', label = 'e coli. sim')
-        ax[j].plot(sim_hrs[j],p_puti_percent, 'g', label = 'p. putida sim')
-        ax[j].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],cb_fc_ec[j], 'b--x', label = 'e coli. fc')
-        ax[j].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],100-cb_fc_ec[j], 'g--x', label = 'p. putida fc')
-        ax[j].plot(cb_hrs[j],cb_fl[j]*100,'.k',markersize = 0.8, label = '$100*fl$')
-        ax[j].plot(sim_hrs[j],(fl_p_all[j]+min_fl[j])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
-        # ax[j].plot(time_all[j],od*100,'-k',lw = 0.5, label = 'od sim')
-        # ax[j].plot(cb_hrs[j],cb_od[j]*100,'--m',lw = 0.5, label = 'od')
+        ax[r][c].plot(sim_hrs[j],e_coli_percent, 'b', label = 'e coli. sim')
+        ax[r][c].plot(sim_hrs[j],p_puti_percent, 'g', label = 'p. putida sim')
+        ax[r][c].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],cb_fc_ec[j], 'b--x', label = 'e coli. fc')
+        ax[r][c].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],100-cb_fc_ec[j], 'g--x', label = 'p. putida fc')
+        ax[r][c].plot(cb_hrs[j],cb_fl[j]*100,'.k',markersize = 0.8, label = '$100*fl$')
+        ax[r][c].plot(sim_hrs[j],(fl_p_all[j]+param.min_fl[file_ind[j]])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
+        # ax[r][c].plot(time_all[j],od*100,'-k',lw = 0.5, label = 'od sim')
+        # ax[r][c].plot(cb_hrs[j],cb_od[j]*100,'--m',lw = 0.5, label = 'od')
 
-        ax[j].legend(loc="upper left")
+        ax[r][c].legend(loc="upper left")
         if (j%2 == 0):
-            ax[j].set_ylabel("Relative composition [%]")
+            ax[r][c].set_ylabel("Relative composition [%]")
         else:
             axr.set_ylabel('Temperature [°C]', color='r')
-            ax[j].tick_params(axis='y', labelleft=True)
+            ax[r][c].tick_params(axis='y', labelleft=True)
         axr.set_yticks(np.append(axr.get_yticks(), critTemp[0]))
         axr.tick_params(axis='y', color='r', labelcolor='r')
         axr.text(1, 1, 'e coli. prefered',
@@ -203,14 +192,14 @@ if __name__ == "__main__":
                 transform=axr.transAxes,
                 color='w',
                 bbox={'facecolor': 'red', 'alpha': 1, 'pad': 0, 'edgecolor': 'r'})
-        ax[j].set_xlabel("Time [h]")
-        ax[j].set_xlim([sim_hrs[j][0]-0.5,sim_hrs[j][-1]+0.5])
-        ax[j].set_ylim([-5,105])
+        ax[r][c].set_xlabel("Time [h]")
+        ax[r][c].set_xlim([sim_hrs[j][0]-0.5,sim_hrs[j][-1]+0.5])
+        ax[r][c].set_ylim([-5,105])
     # TODO: Set titles
-    ax[0].set_title("C8M2")
-    ax[1].set_title("C8M3")
-    fig.suptitle("064-1")
+    ax[0][0].set_title("C8M0")
+    ax[0][1].set_title("C8M1")
+    fig.suptitle("064-2")
     fig.tight_layout()
-    fig.savefig("Images/064-1_lag_3_h_avg_fl_new.svg")
+    fig.savefig("Images/064-2_lag_3_h_avg_fl.png")
     # fig.savefig("Images/064-1_fl.png")
     # plt.show()

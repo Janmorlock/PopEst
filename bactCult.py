@@ -1,6 +1,6 @@
 import numpy as np
 
-from popParam import Param
+from popParam import ModParam
 from growthRates import getGrowthRate
 
 class BactCult:
@@ -11,7 +11,7 @@ class BactCult:
     def __init__(self, bacType, pop_init):
         self.bacType = bacType
         self.pop = pop_init
-        self.param = Param()
+        self.param = ModParam()
 
     def grow(self, T):
         """
@@ -33,7 +33,7 @@ class FlProtein:
     def __init__(self, count_init):
         self.type = 'f'
         self.count = count_init
-        self.param = Param()
+        self.param = ModParam()
 
     def produce(self, pop_p, T):
         """

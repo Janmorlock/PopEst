@@ -2,34 +2,27 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-from popParam import Param
+from popParam import ModParam, getCbDataInfo
 from popSim import loadData, simulateFlProtein, interpolateCbToSim
 from growthRates import plotGrowthRates
 
 if __name__ == "__main__":    
     # SPECIFY DATA
-    # TODO: Add path to chiBio data directory
-    path = '../../Ting/Experiments/062-4'
-    # TODO: Add indeces of files of interest
-    file_ind = [2,4,6,7,0,1,3,5]
-    n_reactors = len(file_ind)
-    # TODO: Add scope indices as in Matlab
-    scope = np.array([[0,1400] for i in range(n_reactors)])
-    # TODO: Adapt min fluorescense values of the respective reactors
-    min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
+    path, file_ind, sampcycle = getCbDataInfo('062-4')
     dil_th = 0.54
     dil_am = 0.1
     # tem = [26, 27, 29, 30, 31, 33, 35, 37]
 
-    param = Param()
-    cb_hrs, cb_od, cb_tem, cb_fl, cb_p1 = loadData(path, file_ind, scope, n_reactors)
+    n_reactors = len(file_ind)
+    cb_hrs, cb_od, cb_tem, cb_fl, cb_p1 = loadData(path, file_ind, sampcycle, n_reactors)
 
+    param = ModParam()
 
     # SIMULATE
     sim_hrs, sim_fl, sim_dil = [], [], []
     for j in range(n_reactors):
         sim_hrs.append(np.arange(0,cb_hrs[j][-1]-cb_hrs[j][0],param.Ts/3600))
-        fl_init = (cb_fl[j][0] - min_fl[j])*cb_od[j][0]
+        fl_init = (cb_fl[j][0] - param.min_fl[file_ind[j]])*cb_od[j][0]
         cb_dil = (np.diff(cb_p1[j], prepend=[0,0,0]) > 0.015)
         # sim_tem = np.full(len(sim_hrs[j]),tem[j])
         sim_tem = interpolateCbToSim(cb_hrs[j], cb_tem[j], sim_hrs[j])
@@ -55,7 +48,7 @@ if __name__ == "__main__":
 
         axr.plot(cb_hrs[j],cb_tem[j],'r',lw=1)
         ax[r][c].plot(cb_hrs[j],cb_fl[j],'.k',markersize = 0.8, label = '$(fl-fl_{min})$')
-        ax[r][c].plot(sim_hrs[j],sim_fl[j]+min_fl[j],'m',lw = 0.5, label = '$(fl_{sim}-fl_{min})$')
+        ax[r][c].plot(sim_hrs[j],sim_fl[j]+param.min_fl[file_ind[j]],'m',lw = 0.5, label = '$(fl_{sim}-fl_{min})$')
         ax[r][c].plot(cb_hrs[j],cb_od[j],'g',lw = 0.5, label = 'p. putida od')
         ax[r][c].vlines(sim_hrs[j][sim_dil[j]==1],-2,2,'g',lw = 0.5, alpha=0.5, label = 'p. putida dil')
         # ax[j].plot(cb_hrs[j],cb_od[j]*100,'--m',lw = 0.5, label = 'od')

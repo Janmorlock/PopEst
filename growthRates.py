@@ -1,10 +1,10 @@
-from popParam import Param
+from popParam import ModParam
 
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import fsolve
 
-param = Param()
+param = ModParam()
 
 def getGrowthRate(bact, temp):
     match bact:
