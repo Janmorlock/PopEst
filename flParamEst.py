@@ -8,7 +8,8 @@ from growthRates import plotGrowthRates
 
 if __name__ == "__main__":    
     # SPECIFY DATA
-    path, file_ind, sampcycle = getCbDataInfo('062-4')
+    dataName = '062-4'
+    path, file_ind, sampcycle, titles = getCbDataInfo(dataName)
     dil_th = 0.54
     dil_am = 0.1
     # tem = [26, 27, 29, 30, 31, 33, 35, 37]
@@ -77,9 +78,8 @@ if __name__ == "__main__":
         ax[r][c].set_xlim([sim_hrs[j][0]-0.5,sim_hrs[j][-1]+0.5])
         ax[r][c].set_ylim([-0.05,1])
         axr.set_ylim([25,38])
-        # TODO: Set titles
-        ax[0][0].set_title("C8M0")
-        ax[0][1].set_title("C8M1")
-        fig.suptitle("064-1")
-        fig.tight_layout()
-        fig.savefig("Images/062-4_fl_sim_prox.png")
+        ax[0][0].set_title(titles[j])
+    # TODO: Set titles
+    fig.suptitle(dataName)
+    fig.tight_layout()
+    fig.savefig("Images/062-4_fl_sim_prox.png")

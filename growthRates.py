@@ -43,7 +43,7 @@ def getGrowthRate(bact, temp):
     return gr
 
 def plotGrowthRates():
-    temp = np.arange(26,38,1)
+    temp = np.arange(param.T_l,param.T_h,1)
     grP = getGrowthRate("p", temp)
     grE = getGrowthRate("e", temp)
     grF = getGrowthRate("f", temp)
@@ -51,7 +51,7 @@ def plotGrowthRates():
     plt.plot(temp,grP,'-xg',label='P. Putida')
     plt.plot(temp,grF,'-xk',label='Fl. Protein')
     plt.xlabel("Temperature [°C]")
-    plt.ylabel("Growth Rate [h^{-h}]")
+    plt.ylabel("Growth Rate [$h^{-1}$]")
     plt.legend()
     plt.savefig("Images/growthRates.png")
     return

@@ -100,9 +100,8 @@ if __name__ == "__main__":
 
     # SPECIFY DATA
     dataName = '064-2'
-    path, file_ind, sampcycle = getCbDataInfo(dataName)
+    path, file_ind, sampcycle, titles = getCbDataInfo(dataName)
     cb_fc_ec = getFcData(dataName)
-    # min_fl = [0.061, 0.059]
 
     n_reactors = len(file_ind)
     cb_hrs, cb_od, cb_tem, cb_fl, cb_p1 = loadData(path, file_ind, sampcycle, n_reactors)
@@ -139,18 +138,25 @@ if __name__ == "__main__":
         fl_p_all.append(simulateFlProtein(fl_init, sim_pop_p, sim_tem, sim_dil, param.Dil_amount, param.Dil_th)/sim_od)
 
 
-    # gR.plotGrowthRates()
+    gR.plotGrowthRates()
     critTemp = gR.getCritTemp()
     assert(26 < critTemp[0] and critTemp[0] < 37)
 
     # ANALYSIS
+    # n_reactors = 1
     n_rows = math.ceil(n_reactors/2)
-    fig, ax = plt.subplots(n_rows,2,sharey='all')
+    n_culumns = 2 if n_reactors > 1 else 1
+    fig, ax = plt.subplots(n_rows,n_culumns,sharey='all')
     fig.set_figheight(n_rows*7)
-    fig.set_figwidth(20)
+    fig.set_figwidth(n_culumns*10)
+    if n_culumns == 1:
+        ax = [ax]
+    if n_rows == 1:
+        ax = [ax]
     for j in range(n_reactors):
         r = j//2
         c = j%2
+        # j = 1
         od = e_coli_all[j] + p_puti_all[j]
         e_coli_percent = e_coli_all[j]/od*100
         p_puti_percent = p_puti_all[j]/od*100
@@ -195,11 +201,8 @@ if __name__ == "__main__":
         ax[r][c].set_xlabel("Time [h]")
         ax[r][c].set_xlim([sim_hrs[j][0]-0.5,sim_hrs[j][-1]+0.5])
         ax[r][c].set_ylim([-5,105])
+        ax[r][c].set_title(titles[j])
     # TODO: Set titles
-    ax[0][0].set_title("C8M0")
-    ax[0][1].set_title("C8M1")
-    fig.suptitle("064-2")
+    fig.suptitle(dataName)
     fig.tight_layout()
-    fig.savefig("Images/064-2_lag_3_h_avg_fl.png")
-    # fig.savefig("Images/064-1_fl.png")
-    # plt.show()
+    fig.savefig("Images/{}/{}r_{}h{}lag_fl.svg".format(dataName,n_reactors,param.Lag,'avg' if param.Avg_temp else ''))
