@@ -17,7 +17,9 @@ class ModParam:
         self.Lag = 3 # hours
         # TODO: Adapt min/max fluorescense values of the respective reactors
         self.min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
-
+        self.max_fl = []
+        self.minv = 0.059
+        self.maxv = 0.290
 
         # Linear line fitting to 062_5 data (without 36°C)
         self.Del_e = 0

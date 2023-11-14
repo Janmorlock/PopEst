@@ -83,7 +83,7 @@ def loadData(path, file_ind, scope, n_reactors):
         df = pd.read_csv(cb_files[i], index_col=None, header=0)
         cb_dfs.append(df)
 
-    cb_hrs, cb_od, cb_tem, cb_fl, cb_p1 = [], [], [], [], []
+    cb_hrs, cb_od, cb_tem, cb_fl, cb_p1, cb_sp = [], [], [], [], [], []
     for i in range(n_reactors):
         cb_hrs.append(cb_dfs[i]["exp_time"][scope[i][0]:scope[i][-1]+1].to_numpy()/3600)
         cb_od_temp = cb_dfs[i]["od_measured"][scope[i][0]:scope[i][-1]+1].to_numpy()
@@ -92,8 +92,9 @@ def loadData(path, file_ind, scope, n_reactors):
         cb_tem.append(cb_dfs[i]["media_temp"][scope[i][0]:scope[i][-1]+1].to_numpy())
         cb_fl.append(cb_dfs[i]["FP1_emit1"][scope[i][0]:scope[i][-1]+1].to_numpy())
         cb_p1.append(cb_dfs[i]["pump_1_rate"][scope[i][0]:scope[i][-1]+1].to_numpy())
+        cb_sp.append(cb_dfs[i]["custom_prog_status"][scope[i][0]:scope[i][-1]+1].to_numpy())
     cb_hrs = [cb_hrs[i]-cb_hrs[i][0] for i in range(n_reactors)]
-    return cb_hrs, cb_od, cb_tem, cb_fl, cb_p1
+    return cb_hrs, cb_od, cb_tem, cb_fl, cb_p1, cb_sp
 
 
 if __name__ == "__main__":
@@ -104,7 +105,7 @@ if __name__ == "__main__":
     cb_fc_ec = getFcData(dataName)
 
     n_reactors = len(file_ind)
-    cb_hrs, cb_od, cb_tem, cb_fl, cb_p1 = loadData(path, file_ind, sampcycle, n_reactors)
+    cb_hrs, cb_od, cb_tem, cb_fl, cb_p1, cb_sp = loadData(path, file_ind, sampcycle, n_reactors)
 
     param = ModParam()
 
@@ -166,17 +167,19 @@ if __name__ == "__main__":
         axr.set_zorder(1)
         ax[r][c].patch.set_visible(False)
 
-        axr.plot(cb_hrs[j],cb_tem[j],'--r',lw=0.5,alpha=0.4)
-        axr.plot(sim_hrs[j],sim_tem_e[j],'r',lw=1)
-        axr.hlines(critTemp[0],sim_hrs[j][0]-1,sim_hrs[j][-1]+1,'r',lw=0.5)
-        ax[r][c].plot(sim_hrs[j],e_coli_percent, 'b', label = 'e coli. sim')
-        ax[r][c].plot(sim_hrs[j],p_puti_percent, 'g', label = 'p. putida sim')
-        ax[r][c].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],cb_fc_ec[j], 'b--x', label = 'e coli. fc')
-        ax[r][c].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],100-cb_fc_ec[j], 'g--x', label = 'p. putida fc')
-        ax[r][c].plot(cb_hrs[j],cb_fl[j]*100,'.k',markersize = 0.8, label = '$100*fl$')
+        axr.plot(cb_hrs[j],cb_tem[j],'r',lw=0.5)
+        # axr.plot(sim_hrs[j],sim_tem_e[j],'r',lw=1)
+        # axr.hlines(critTemp[0],sim_hrs[j][0]-1,sim_hrs[j][-1]+1,'r',lw=0.5)
+        # ax[r][c].plot(sim_hrs[j],e_coli_percent, 'b', label = 'e coli. sim')
+        ax[r][c].plot(sim_hrs[j],p_puti_percent, 'k', label = 'p. putida sim')
+        # ax[r][c].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],cb_fc_ec[j], 'b--x', label = 'e coli. fc')
+        ax[r][c].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],100-cb_fc_ec[j], 'k--x', label = 'p. putida fc',lw=0.4)
+        ax[r][c].plot(cb_hrs[j],(cb_fl[j]-param.minv)/(param.maxv-param.minv)*100,'.g',markersize = 0.8, label = 'fluorescense measured')
         ax[r][c].plot(sim_hrs[j],(fl_p_all[j]+param.min_fl[file_ind[j]])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
         # ax[r][c].plot(time_all[j],od*100,'-k',lw = 0.5, label = 'od sim')
         # ax[r][c].plot(cb_hrs[j],cb_od[j]*100,'--m',lw = 0.5, label = 'od')
+        ax[r][c].plot(cb_hrs[j],(cb_sp[j]-param.minv)/(param.maxv-param.minv)*100,'g--',markersize = 0.8, label = 'fluorescense setpoint')
+
 
         ax[r][c].legend(loc="upper left")
         if (j%2 == 0):
@@ -184,7 +187,7 @@ if __name__ == "__main__":
         else:
             axr.set_ylabel('Temperature [°C]', color='r')
             ax[r][c].tick_params(axis='y', labelleft=True)
-        axr.set_yticks(np.append(axr.get_yticks(), critTemp[0]))
+        # axr.set_yticks(np.append(axr.get_yticks(), critTemp[0]))
         axr.tick_params(axis='y', color='r', labelcolor='r')
         axr.text(1, 1, 'e coli. prefered',
                 horizontalalignment='right',
@@ -205,4 +208,4 @@ if __name__ == "__main__":
     # TODO: Set titles
     fig.suptitle(dataName)
     fig.tight_layout()
-    fig.savefig("Images/{}/{}r_{}h{}lag_fl.svg".format(dataName,n_reactors,param.Lag,'avg' if param.Avg_temp else ''))
+    fig.savefig("Images/{}/{}r_{}h{}lag_fl_new.svg".format(dataName,n_reactors,param.Lag,'avg' if param.Avg_temp else ''))

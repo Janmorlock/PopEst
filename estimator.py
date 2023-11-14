@@ -24,25 +24,28 @@ class EKF:
         estParam : EstConst TODO: update
             Estimation constants
         """
+        self.n_reactors = n_reactors
+        self.dithered = dithered
         self.estParam = EstParam()
         self.modelParam = ModelParam()
-        self.model = Model(dithered, self.estParam.Ts)
-        self.n_reactors = n_reactors
+        self.model = Model(self.dithered, self.estParam.Ts)
         self.time_prev = np.zeros(self.n_reactors)
         self.temp_prev = np.zeros(self.n_reactors)
 
         e0 = self.estParam.e_rel_init * self.estParam.od_init
         p0 = (1 - self.estParam.e_rel_init) * self.estParam.od_init
-        fp0 = (np.full((self.n_reactors,1), self.estParam.fl_init) - self.modelParam.min_fl)/self.estParam.od_init
-        self.estimates = np.full((self.n_reactors, 2),[e0, p0])
-        self.estimates = np.concatenate((self.estimates, fp0), axis=1)
+        fp0 = (np.full((1,self.n_reactors), self.estParam.fl_init) - self.modelParam.min_fl)*self.estParam.od_init
+        est = np.full((self.n_reactors, 2),[e0, p0])
+        self.est = np.concatenate((est, fp0.T), axis=1)
 
-        self.variances = np.full((self.n_reactors, self.estParam.num_states, self.estParam.num_states),np.diag([0.1, 0.1, 0.1]))
+        self.var = np.full((self.n_reactors, self.estParam.num_states, self.estParam.num_states),np.diag([0.1, 0.1, 0.1]))
+        
+    def reset(self):
+        self.model = Model(self.dithered, self.estParam.Ts)
     
-    
-    def prediction(self, r_ind: int, time: float, u: float) -> Tuple[np.ndarray, np.ndarray]:
+    def estimate(self, r_ind: int, time: float, u: float, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Estimate the states of the system using the extended Kalman filter.
+        Perform prediction step of the states of the system using the extended Kalman filter.
 
         Parameters
         ----------
@@ -70,9 +73,12 @@ class EKF:
             self.temp_prev[r_ind] = u
         else: # Prediction step
             dt = time - self.time_prev[r_ind]
-            self.estimates[r_ind], self.variances[r_ind] = self.model.predict(self.estimates[r_ind], self.variances[r_ind], self.temp_prev[r_ind], dt)
+            self.est[r_ind], self.var[r_ind] = self.model.predict(self.est[r_ind], self.var[r_ind], self.temp_prev[r_ind], dt)
 
             self.time_prev[r_ind] = time
             self.temp_prev[r_ind] = u
 
-        return self.estimates[r_ind], self.variances[r_ind]
+        # MeasurementUpdate
+        self.est[r_ind], self.var[r_ind] = self.model.update(r_ind, self.est[r_ind], self.var[r_ind], y)
+
+        return self.est[r_ind], self.var[r_ind]

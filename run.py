@@ -21,12 +21,12 @@ def getCritTemp():
     return temp
 
 def plotGrowthRates(expParam):
-    temp = np.full((3,3),np.arange(expParam.T_l,expParam.T_h,1))
+    temp = np.full((3,11),np.arange(expParam.T_l,expParam.T_h,1))
     gr = getGrowthRates(temp)
     critT = getCritTemp()[0]
-    plt.plot(temp,gr[0],'-xb',label='E coli.')
-    plt.plot(temp,gr[1],'-xg',label='P. Putida')
-    plt.plot(temp,gr[2],'-xk',label='Fl. Protein')
+    plt.plot(temp[0],gr[0],'-xb',label='E coli.')
+    plt.plot(temp[0],gr[1],'-xg',label='P. Putida')
+    plt.plot(temp[0],gr[2],'-xk',label='Fl. Protein')
     plt.vlines(critT,0,1,colors='r',label='Critical Temperature')
     plt.xlim(expParam.T_l-1,expParam.T_h+1)
     plt.xlabel("Temperature [°C]")
@@ -46,7 +46,7 @@ class CbData:
         self.time, self.time_h, self.od, self.temp, self.fl, self.p1 = [], [], [], [], [], []
         for j in range(n_reactors):
             time = cb_dfs[j]["exp_time"][scope[j][0]:scope[j][-1]+1].to_numpy()
-            self.time.append(time[j]-time[j][0])
+            self.time.append(time-time[0])
             self.time_h.append(self.time[j]/3600)
             od = cb_dfs[j]["od_measured"][scope[j][0]:scope[j][-1]+1].to_numpy()
             od[od < 0.005] = 0.005
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     expParam = ExpParam()
     modelParam = ModelParam()
     cbParam = CbDataParam(data_name)
-    cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.cb_fc_ec, cbParam.n_reactors)
+    cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
     # Initialize the estimator
     ekf = EKF(cbParam.n_reactors, expParam.Dil_dithered)
 
@@ -72,12 +72,16 @@ if __name__ == "__main__":
     variances = [[] for j in range(cbParam.n_reactors)]
 
     for j in range(cbParam.n_reactors):
-        for k in range(1, len(cbData.time[j])):
+        ekf.reset()
+        for k in range(len(cbData.time[j])):
             # Run the EKF
-            pred, pred_variance = ekf.prediction(j, cbData.time[j][k], cbData.temp[j][k])
+            y = np.array([cbData.fl[j][k],cbData.od[j][k]])
+            pred, pred_variance = ekf.estimate(j, cbData.time[j][k], cbData.temp[j][k], y)
+            if k == len(cbData.time[j])-1:
+                print("Final variance: {}".format(pred_variance))
 
-            estimates[j][k] = pred
-            variances[j][k] = pred_variance
+            estimates[j].append(pred.copy())
+            variances[j].append(pred_variance.copy())
 
     plotGrowthRates(expParam)
     critTemp = getCritTemp()[0]
@@ -98,9 +102,12 @@ if __name__ == "__main__":
         r = j//2
         c = j%2
         # j = 1
-        od = estimates[j][:][0] + estimates[j][:][0]
-        e_coli_percent = estimates[j][:][0]/od*100
-        p_puti_percent = estimates[j][:][1]/od*100
+        e_coli = np.array([estimates[j][k][0] for k in range(len(estimates[j]))])
+        p_puti = np.array([estimates[j][k][1] for k in range(len(estimates[j]))])
+        fp = np.array([estimates[j][k][2] for k in range(len(estimates[j]))])
+        od = e_coli + p_puti
+        e_coli_percent = e_coli/od*100
+        p_puti_percent = p_puti/od*100
 
         axr = ax[r][c].twinx()
         ax[r][c].set_zorder(2)
@@ -115,8 +122,8 @@ if __name__ == "__main__":
         ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],cbParam.cb_fc_ec[j], 'b--x', label = 'e coli. fc')
         ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],100-cbParam.cb_fc_ec[j], 'g--x', label = 'p. putida fc')
         ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.k',markersize = 0.8, label = '$100*fl$')
-        ax[r][c].plot(cbData.time_h[j],(estimates[j][:][2][j]/od + modelParam.min_fl[cbParam.file_ind[j]])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
-        # ax[r][c].plot(time_all[j],od*100,'-k',lw = 0.5, label = 'od sim')
+        ax[r][c].plot(cbData.time_h[j],(fp/od[j] + modelParam.min_fl[j])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
+        ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.5, label = 'od sim')
         # ax[r][c].plot(cbData.time_h[j],cb_od[j]*100,'--m',lw = 0.5, label = 'od')
 
         ax[r][c].legend(loc="upper left")
@@ -146,4 +153,4 @@ if __name__ == "__main__":
     # TODO: Set titles
     fig.suptitle(data_name)
     fig.tight_layout()
-    fig.savefig("Images/{}/{}r_{}h{}lag_fl_new.svg".format(data_name,cbParam.n_reactors,modelParam.Lag,'avg' if modelParam.Avg_temp else ''))
+    fig.savefig("Images/{}/{}r_{}h{}lag_fl_new_up.svg".format(data_name,cbParam.n_reactors,modelParam.Lag,'avg' if modelParam.Avg_temp else ''))

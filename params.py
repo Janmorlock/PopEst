@@ -26,7 +26,9 @@ class ModelParam:
         self.Avg_temp = True
         self.Lag = 3 # hours
         # TODO: Adapt min/max fluorescense values of the respective reactors
-        self.min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
+        # self.min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
+        self.min_fl = [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]
+        self.max_fl = [0.280, 0.408, 0.355, 0.375, 0.323, 0.391, 0.297, 0.310]
 
 
         # Linear line fitting to 062_5 data (without 36°C)
@@ -51,9 +53,13 @@ class ModelParam:
         self.sigma_e_dil = 0.05
         self.sigma_p_dil = 0.05
         self.sigma_fp_dil = 0.05
-        self.sigma_e = 0.1
-        self.sigma_p = 0.1
-        self.sigma_fp = 0.05
+        self.sigma_e = 0.01
+        self.sigma_p = 0.01
+        self.sigma_fp = 1
+
+        # Measurement noise standard deviation
+        self.sigma_od = 1e-1
+        self.sigma_fl = 2e-4
 
 
 class EstParam:
@@ -63,7 +69,7 @@ class EstParam:
         self.num_inputs = 1
         self.num_outputs = 2
 
-        self.od_init = 0.5 # initial belief optical density
+        self.od_init = 0.25 # initial belief optical density
         self.e_rel_init = 0.5 # %, initial relative belief of e. coli abundance
         self.fl_init = 0.1 # initial belief of fluorescence
 

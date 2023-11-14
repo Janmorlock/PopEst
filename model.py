@@ -22,6 +22,11 @@ class Model:
         self.L = np.eye(3)
         self.Q = np.diag([self.modelParam.sigma_e**2, self.modelParam.sigma_p**2, self.modelParam.sigma_fp**2])
 
+        self.H = np.zeros((2,3))
+        self.M = np.eye(2)
+        self.R = np.diag([self.modelParam.sigma_fl**2, self.modelParam.sigma_od**2])
+
+
     def predict(self, x_prev: np.ndarray, p_prev: np.ndarray, u: float, dt: float) -> Tuple[np.ndarray, np.ndarray]:
         """
         Dilutes if needed and predicts states their variance after dt seconds.
@@ -44,12 +49,12 @@ class Model:
                 p_dil = self.A_dil @ p_prev @ self.A_dil.T + self.L_dil @ self.Q_dil @ self.L_dil.T
             
         p_pred = p_dil
-        x = x_dil
+        x_pred = x_dil
         # Approximate abundance and their varaince after dt seconds of growth
         temp = np.full(3,u)
         for i in range(round(dt/self.ts)):
             # Modifiy temperature
-            self.temps = np.append(self.temps[:,1:],np.full(2,u),axis=1)
+            self.temps = np.append(self.temps[:,1:],np.full((2,1),u),axis=1)
             if self.modelParam.Avg_temp:
                 temp[0:2] = np.average(self.temps, axis=1)
             else:
@@ -58,13 +63,28 @@ class Model:
             self.A = np.array([[1 + self.ts/3600*getGrowthRates(temp)[0], 0, 0],
                       [0, 1 + self.ts/3600*getGrowthRates(temp)[1], 0],
                       [0, self.ts/3600*getGrowthRates(temp)[1], 1]])
-            self.L = np.diag([self.ts/3600*x[0], self.ts/3600*x[1], self.ts/3600*x[1]])
+            self.L = np.diag([self.ts/3600*x_pred[0], self.ts/3600*x_pred[1], self.ts/3600*x_pred[1]])
             # Abundance after Ts seconds
-            x = x_dil + self.ts/3600*getGrowthRates(temp)*np.array([x_dil[0], x_dil[1], x_dil[1]])
+            x_pred = x_pred + self.ts/3600*getGrowthRates(temp)*np.array([x_pred[0], x_pred[1], x_pred[1]])
 
             p_pred = self.A @ p_pred @ self.A.T + self.L @ self.Q @ self.L.T
 
-        return x, p_pred
+        return x_pred, p_pred
+    
+    def update(self, r_ind, x_pred: np.ndarray, p_pred: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        od = x_pred[0] + x_pred[1]
+        self.H = np.array([[-x_pred[2]/od**2, -x_pred[2]/od**2, 1/od],
+                           [1, 1, 0]])
+        K = np.linalg.solve(self.H @ p_pred.T @ self.H.T + self.M @ self.R.T @ self.M.T, self.H @ p_pred.T).T
+        # K = Pp @ self.H.T @ linalg.inv(self.H @ Pp @ self.H.T + self.M @ self.R_g @ self.M.T)
+        y_est = np.array([x_pred[2]/od + self.modelParam.min_fl[r_ind], od])
+        xm = x_pred + K @ (y - y_est)
+        xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
+        Pm = (np.eye(3) - K @ self.H) @ p_pred
+
+        return xm, Pm
+
+
 
 def getGrowthRates(temp: np.ndarray) -> np.ndarray:
     """
@@ -76,7 +96,7 @@ def getGrowthRates(temp: np.ndarray) -> np.ndarray:
 
     beta_f = (modelParam.c_sl - modelParam.c_sh)/(modelParam.T_sl - modelParam.T_sh)
     alpha_f = modelParam.c_sl - beta_f*modelParam.T_sl
-    gr_f = beta_f*temp[3] + alpha_f
+    gr_f = beta_f*temp[2] + alpha_f
     if gr_f.size > 1:
         gr_f[gr_f<modelParam.c_sh] = modelParam.c_sh
         gr_f[gr_f>modelParam.c_sl] = modelParam.c_sl
