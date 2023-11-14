@@ -122,9 +122,9 @@ if __name__ == "__main__":
         ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],cbParam.cb_fc_ec[j], 'b--x', label = 'e coli. fc')
         ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],100-cbParam.cb_fc_ec[j], 'g--x', label = 'p. putida fc')
         ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.k',markersize = 0.8, label = '$100*fl$')
-        ax[r][c].plot(cbData.time_h[j],(fp/od[j] + modelParam.min_fl[j])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
+        ax[r][c].plot(cbData.time_h[j],(fp/od + modelParam.min_fl[j])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
         ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.5, label = 'od sim')
-        # ax[r][c].plot(cbData.time_h[j],cb_od[j]*100,'--m',lw = 0.5, label = 'od')
+        # ax[r][c].plot(cbData.time_h[j],cbData.od[j]*100,'.m',markersize = 0.8, label = 'od')
 
         ax[r][c].legend(loc="upper left")
         if (j%2 == 0):
@@ -153,4 +153,4 @@ if __name__ == "__main__":
     # TODO: Set titles
     fig.suptitle(data_name)
     fig.tight_layout()
-    fig.savefig("Images/{}/{}r_{}h{}lag_fl_new_up.svg".format(data_name,cbParam.n_reactors,modelParam.Lag,'avg' if modelParam.Avg_temp else ''))
+    fig.savefig("Images/{}/{}r_{}h{}lag_fl_new_wood.svg".format(data_name,cbParam.n_reactors,modelParam.Lag,'avg' if modelParam.Avg_temp else ''))

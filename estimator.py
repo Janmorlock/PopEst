@@ -38,7 +38,7 @@ class EKF:
         est = np.full((self.n_reactors, 2),[e0, p0])
         self.est = np.concatenate((est, fp0.T), axis=1)
 
-        self.var = np.full((self.n_reactors, self.estParam.num_states, self.estParam.num_states),np.diag([0.1, 0.1, 0.1]))
+        self.var = np.full((self.n_reactors, self.estParam.num_states, self.estParam.num_states),np.diag([self.estParam.sigma_e_init**2, self.estParam.sigma_p_init**2, self.estParam.sigma_fp_init**2]))
         
     def reset(self):
         self.model = Model(self.dithered, self.estParam.Ts)

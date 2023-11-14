@@ -26,11 +26,7 @@ class Model:
         self.M = np.eye(2)
         self.R = np.diag([self.modelParam.sigma_fl**2, self.modelParam.sigma_od**2])
 
-
-    def predict(self, x_prev: np.ndarray, p_prev: np.ndarray, u: float, dt: float) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Dilutes if needed and predicts states their variance after dt seconds.
-        """
+    def dilute(self, x_prev: np.ndarray, p_prev: np.ndarray):
         x_dil = x_prev
         p_dil = p_prev
         # Dilution, checked at same rate as real system
@@ -45,11 +41,17 @@ class Model:
                 den = (x_prev[0] + x_prev[1])**2
                 self.A_dil = np.array([[x_prev[1]/den-1, -x_prev[0]/den, 0],
                                        [-x_prev[1]/den, x_prev[0]/den-1, 0],
-                                       [-x_prev[2]/den, -x_prev[2]/den, x_prev[2]/den-1]])
+                                       [-x_prev[2]/den, -x_prev[2]/den, 1/(x_prev[0]+x_prev[1]) - 1]])
                 p_dil = self.A_dil @ p_prev @ self.A_dil.T + self.L_dil @ self.Q_dil @ self.L_dil.T
-            
-        p_pred = p_dil
-        x_pred = x_dil
+        return x_dil, p_dil
+
+
+    def predict(self, x_prev: np.ndarray, p_prev: np.ndarray, u: float, dt: float) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Dilutes if needed and predicts states their variance after dt seconds.
+        """ 
+        x_pred, p_pred = self.dilute(x_prev, p_prev)
+
         # Approximate abundance and their varaince after dt seconds of growth
         temp = np.full(3,u)
         for i in range(round(dt/self.ts)):
@@ -62,7 +64,7 @@ class Model:
             # Jacobian of growth
             self.A = np.array([[1 + self.ts/3600*getGrowthRates(temp)[0], 0, 0],
                       [0, 1 + self.ts/3600*getGrowthRates(temp)[1], 0],
-                      [0, self.ts/3600*getGrowthRates(temp)[1], 1]])
+                      [0, self.ts/3600*getGrowthRates(temp)[2], 1]])
             self.L = np.diag([self.ts/3600*x_pred[0], self.ts/3600*x_pred[1], self.ts/3600*x_pred[1]])
             # Abundance after Ts seconds
             x_pred = x_pred + self.ts/3600*getGrowthRates(temp)*np.array([x_pred[0], x_pred[1], x_pred[1]])
@@ -76,7 +78,7 @@ class Model:
         self.H = np.array([[-x_pred[2]/od**2, -x_pred[2]/od**2, 1/od],
                            [1, 1, 0]])
         K = np.linalg.solve(self.H @ p_pred.T @ self.H.T + self.M @ self.R.T @ self.M.T, self.H @ p_pred.T).T
-        # K = Pp @ self.H.T @ linalg.inv(self.H @ Pp @ self.H.T + self.M @ self.R_g @ self.M.T)
+        # K = p_pred @ self.H.T @ np.linalg.inv(self.H @ p_pred @ self.H.T + self.M @ self.R @ self.M.T)
         y_est = np.array([x_pred[2]/od + self.modelParam.min_fl[r_ind], od])
         xm = x_pred + K @ (y - y_est)
         xm[np.isnan(xm)] = x_pred[np.isnan(xm)]

@@ -50,16 +50,16 @@ class ModelParam:
         self.c_sh = 0.005
 
         # Process noise standard deviation
-        self.sigma_e_dil = 0.05
-        self.sigma_p_dil = 0.05
-        self.sigma_fp_dil = 0.05
-        self.sigma_e = 0.01
-        self.sigma_p = 0.01
+        self.sigma_e_dil = 0.01
+        self.sigma_p_dil = 0.01
+        self.sigma_fp_dil = 0.01
+        self.sigma_e = 1e-3
+        self.sigma_p = 1e-3
         self.sigma_fp = 1
 
         # Measurement noise standard deviation
         self.sigma_od = 1e-1
-        self.sigma_fl = 2e-4
+        self.sigma_fl = 1e-2
 
 
 class EstParam:
@@ -71,7 +71,11 @@ class EstParam:
 
         self.od_init = 0.25 # initial belief optical density
         self.e_rel_init = 0.5 # %, initial relative belief of e. coli abundance
-        self.fl_init = 0.1 # initial belief of fluorescence
+        self.fl_init = 0.2 # initial belief of fluorescence
+
+        self.sigma_e_init = 0.01
+        self.sigma_p_init = 0.01
+        self.sigma_fp_init = 0.07
 
 
 class CbDataParam:
