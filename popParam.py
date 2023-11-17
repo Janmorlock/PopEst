@@ -16,7 +16,8 @@ class ModParam:
         self.Avg_temp = True
         self.Lag = 3 # hours
         # TODO: Adapt min/max fluorescense values of the respective reactors
-        self.min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
+        # self.min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
+        self.min_fl = [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061] # [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]
         self.max_fl = []
         self.minv = 0.059
         self.maxv = 0.290
