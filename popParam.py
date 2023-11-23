@@ -24,16 +24,14 @@ class ModParam:
         self.maxv = 0.290
 
         # Linear line fitting to 062_5 data (without 36°C)
-        self.Del_e = 0
-        self.Gam_e =  0 # 0.008511
-        self.Beta_e = 0.08388 # -0.45
-        self.Alpha_e = -1.934 # 6.334
+        self.Beta_e = np.array([0.08388]) # -0.45
+        self.Alpha_e =np.array([-1.934]) # 6.334
 
         # Cubic line fitting to 062_5 data
-        self.Del_p = -0.001184
-        self.Gam_p =  0.09397
-        self.Beta_p = -2.413
-        self.Alpha_p = 20.74
+        self.Del_p = np.array([-0.001184])
+        self.Gam_p =  np.array([0.09397])
+        self.Beta_p = np.array([-2.413])
+        self.Alpha_p = np.array([20.74])
 
         # Pw linear model for fluorescent protein dynamcs
         self.T_sl = 33
