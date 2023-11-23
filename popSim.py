@@ -1,6 +1,4 @@
 from popParam import ModParam, getCbDataInfo, getFcData
-from bactCult import BactCult, FlProtein
-import growthRates as gR
 
 import pandas as pd
 import glob
@@ -8,6 +6,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import scipy.signal as ss
+from scipy.optimize import fsolve
+
+param = ModParam()
+
+def f(xy):
+    x, y = xy
+    gr = getGrowthRate(np.full(2,x),param)
+    z = np.array([y - gr[:,0][0],
+                  y - gr[:,1][0]])
+    return z
+
+def getCritTemp():
+    temp = fsolve(f, [33.0, 0.8])
+    return temp
+
+def plotGrowthRates(ax, parameters, label):
+    temp = np.full((2,11),np.arange(parameters.temp_l,parameters.temp_h,1))
+    gr = getGrowthRate(temp, parameters)
+    # critT = getCritTemp()[0]
+    ax.plot(temp[0],gr[:,0],"-x{}".format("k" if (label == "prior") else "b"),label="E coli. {}".format(label))
+    ax.plot(temp[0],gr[:,1],"-o{}".format("k" if (label == "prior") else "g"),label='P. Putida {}'.format(label))
+    # plt.plot(temp[0],gr[2],'-xk',label='Fl. Protein')
+    # ax.vlines(critT,0,1,colors='r',label='Critical Temperature')
+    return
 
 def interpolateCbToSim(cb_hrs, cb_data, sim_hrs, method='hold'):
     count = 0
@@ -103,12 +125,11 @@ def loadData(path, file_ind, scope, n_reactors):
     cb_hrs = [cb_hrs[i]-cb_hrs[i][0] for i in range(n_reactors)]
     return cb_hrs, cb_od, cb_tem, cb_fl, cb_p1, cb_sp
 
-
 if __name__ == "__main__":
 
     # SPECIFY DATA
     dataName = '064-2'
-    n_samples = 5000
+    n_samples = 10000
     train_ind = [0,2,4,6]
     test_ind = [1,3,5,7]
     all_ind = train_ind+test_ind
@@ -118,7 +139,8 @@ if __name__ == "__main__":
 
     cb_hrs, cb_od, cb_tem, cb_fl, cb_p1, cb_sp = loadData(path, file_ind, sampcycle, n_reactors)
 
-    param = ModParam()
+    fig, ax = plt.subplots()
+    plotGrowthRates(ax, param, "prior")
 
     sim_tem_e, sim_tem_p, sim_hrs = [], [], []
     p_rel_prior= []
@@ -188,11 +210,17 @@ if __name__ == "__main__":
         x = simulateCultures(e_init, p_init, cb_hrs[i], sim_hrs[i], sim_tem_e[i], sim_tem_p[i], param)
         p_rel_test.append(np.array(x[:,:,1])/(np.array(x[:,:,1])+np.array(x[:,:,0]))*100)
 
-
-    # gR.plotGrowthRates()
-    # critTemp = gR.getCritTemp()
+    # critTemp = getCritTemp()
     # assert(26 < critTemp[0] and critTemp[0] < 37)
+    plotGrowthRates(ax, param, "opt")
+
     # ANALYSIS
+    ax.set_xlim(param.temp_l-1,param.temp_h+1)
+    ax.set_xlabel("Temperature [°C]")
+    ax.set_ylabel("Growth Rate [$h^{-1}$]")
+    ax.legend()
+    fig.savefig("Images/{}/growthRates.png".format(dataName))
+
     # n_reactors = 1
     n_rows = math.ceil(n_reactors/2)
     n_culumns = 2 if n_reactors > 1 else 1
@@ -245,7 +273,7 @@ if __name__ == "__main__":
         # axr.plot(sim_hrs[i],sim_tem_e[i],'r',lw=1)
         # axr.hlines(critTemp[0],sim_hrs[i][0]-1,sim_hrs[i][-1]+1,'r',lw=0.5)
         ax[r][c].plot(cb_hrs[i],p_rel_train[j][:,0], 'k', label = 'p. putida train', alpha=0.1, lw=0.5)
-        for s in range(1,n_samples):
+        for s in range(1,min(n_samples,200)):
             ax[r][c].plot(cb_hrs[i],p_rel_train[j][:,s], 'k', alpha=0.1, lw=0.5)
         ax[r][c].plot(cb_hrs[i],p_rel_train[j][:,s_min], 'g', label = 'p. putida opt')
         ax[r][c].plot(cb_hrs[i][sampcycle[i]-sampcycle[i][0]],100-cb_fc_ec[i], 'gx', label = 'p. putida fc',lw=0.4)

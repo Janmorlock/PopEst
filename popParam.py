@@ -5,8 +5,8 @@ class ModParam:
     def __init__(self):
         self.Ts = 1 # seconds
 
-        self.T_l = 26
-        self.T_h = 37
+        self.temp_l = 26
+        self.temp_h = 37
 
         self.T_pre_e = 37
         self.T_pre_p = 26

@@ -5,7 +5,6 @@ from scipy.signal import argrelextrema
 
 from popParam import ModParam, getCbDataInfo
 from popSim import loadData, simulateFlProtein, interpolateCbToSim
-from growthRates import plotGrowthRates
 
 if __name__ == "__main__":    
     # SPECIFY DATA
