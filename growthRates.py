@@ -6,22 +6,22 @@ from scipy.optimize import fsolve
 
 param = ModParam()
 
-def getGrowthRate(bact, temp):
+def getGrowthRate(bact, temp, parameters):
     match bact:
         case "e":
-            gr = param.Del_e*temp**3 + param.Gam_e*temp**2 + param.Beta_e*temp + param.Alpha_e
+            gr = parameters.Del_e*temp**3 + parameters.Gam_e*temp**2 + parameters.Beta_e*temp + parameters.Alpha_e
         case "p":
-            gr = param.Del_p*temp**3 + param.Gam_p*temp**2 + param.Beta_p*temp + param.Alpha_p
+            gr = parameters.Del_p*temp**3 + parameters.Gam_p*temp**2 + parameters.Beta_p*temp + parameters.Alpha_p
         case "f":
-            # beta_f = (param.c_sl - param.c_sh)/(param.T_sl - param.T_sh)
-            # alpha_f = param.c_sl - beta_f*param.T_sl
+            # beta_f = (parameters.c_sl - parameters.c_sh)/(parameters.T_sl - parameters.T_sh)
+            # alpha_f = parameters.c_sl - beta_f*parameters.T_sl
             # gr = beta_f*temp + alpha_f
             # if gr.size > 1:
-            #     gr[gr<param.c_sh] = param.c_sh
-            #     gr[gr>param.c_sl] = param.c_sl
+            #     gr[gr<parameters.c_sh] = parameters.c_sh
+            #     gr[gr>parameters.c_sl] = parameters.c_sl
             # else:
-            #     gr = max(param.c_sh, gr)
-            #     gr = min(param.c_sl, gr)
+            #     gr = max(parameters.c_sh, gr)
+            #     gr = min(parameters.c_sl, gr)
             gr = 0
             if temp == 26:
                 gr = 0.17

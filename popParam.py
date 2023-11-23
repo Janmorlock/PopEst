@@ -13,6 +13,7 @@ class ModParam:
 
         self.Dil_th = 0.51
         self.Dil_amount = 0.02
+        self.Dil_sp = 0.5
         self.Avg_temp = True
         self.Lag = 3 # hours
         # TODO: Adapt min/max fluorescense values of the respective reactors
@@ -68,6 +69,15 @@ def getCbDataInfo(dataName):
                         np.array([946, 1032, 1145, 1258, 1366, 1483, 2301, 2425, 2542])]
             sampcycle = [sampcycle[i][0:7]-1 for i in range(len(file_ind))] # adapts indeces to python
             titles = ['C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3']
+        case '064-2-test':
+            path = '../../Ting/Experiments/064-2'
+            # Indeces of files of interest
+            file_ind = [3,6]
+            # Sampcycle indices as in Matlab
+            sampcycle = [np.array([946, 1032, 1145, 1259, 1368, 1485, 2303, 2426, 2543, 2668]),
+                        np.array([946, 1032, 1145, 1258, 1367, 1483, 2301, 2424, 2540, 2665])]
+            sampcycle = [sampcycle[i][0:7]-1 for i in range(len(file_ind))] # adapts indeces to python
+            titles = ['C8M0','C8M2']
         case '062-4':
             path = '../../Ting/Experiments/062-4'
             # Indeces of files of interest
@@ -99,6 +109,11 @@ def getFcData(dataName):
                         FC_data[9::8].to_numpy(),
                         FC_data[10::8].to_numpy(),
                         FC_data[11::8].to_numpy()]
+        case '064-2-test':
+            FC_file = pd.read_excel('../../Ting/Experiments/064-2/231027 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_data = FC_file['% Parent.1'] + FC_file['% Parent.2']
+            cb_fc_ec = [FC_data[4::8].to_numpy(),
+                        FC_data[6::8].to_numpy()]
         case _:
             raise Exception('Data information of {} not given.'.format(dataName))
     return cb_fc_ec

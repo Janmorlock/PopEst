@@ -13,17 +13,18 @@ class BactCult:
         self.pop = pop_init
         self.param = ModParam()
 
-    def grow(self, T):
+    def grow(self, T, parameters):
         """
         Given the temperature, go one time step further and update the self.pop attribute.
         """
-        self.pop *= 1 + self.param.Ts/3600*getGrowthRate(self.bacType, T)
+        self.pop *= 1 + self.param.Ts/3600*getGrowthRate(self.bacType, T, parameters)
         
     def dilute(self, pop_other):
         """
         Take self.dil_am out of the reactor and update self.pop correspondingly.
         """
-        self.pop -= self.param.Dil_amount*self.pop/(self.pop + pop_other)
+        # self.pop -= self.param.Dil_amount*self.pop/(self.pop + pop_other)
+        self.pop = (2*self.param.Dil_sp/(self.pop + pop_other) - 1)*self.pop
 
 class FlProtein:
     """
@@ -39,7 +40,7 @@ class FlProtein:
         """
         Given the temperature, go one time step further and update the self.count attribute.
         """
-        self.count = self.count + self.param.Ts/3600*getGrowthRate(self.type, T)*pop_p
+        self.count = self.count + self.param.Ts/3600*getGrowthRate(self.type, T, self.param)*pop_p
         
     def dilute(self, dil_am, dil_th):
         """
