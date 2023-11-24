@@ -11,7 +11,6 @@ class CustModel:
         self.parameters['dil_th'] = self.parameters['od_setpoint'] + self.parameters['zig']
         self.parameters['dil_amount'] = self.parameters['zig']*(1.5 + 1)
         self.parameters['lag_ind'] = int(self.parameters['lag']*3600/self.parameters['ts']) # Lag indeces
-        self.parameters['r'] = np.array([[self.parameters['sigma_fl']**2]])
         self.parameters['r'] = np.diag([self.parameters['sigma_fl']**2, self.parameters['sigma_od']**2])
         self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
 
@@ -124,6 +123,7 @@ class CustModel:
         """
         gr_e = self.parameters['beta_e']*temp[0] + self.parameters['alpha_e']
         gr_p = self.parameters['del_p']*temp[1]**3 + self.parameters['gam_p']*temp[1]**2 + self.parameters['beta_p']*temp[1] + self.parameters['alpha_p']
+        # gr_f = self.parameters['gr_fp'][0]*temp[2]**4 + self.parameters['gr_fp'][1]*temp[2]**3 + self.parameters['gr_fp'][2]*temp[2]**2 + self.parameters['gr_fp'][3]*temp[2] + self.parameters['gr_fp'][4]
 
         beta_f = (self.parameters['c_sl'] - self.parameters['c_sh'])/(self.parameters['temp_sl'] - self.parameters['temp_sh'])
         alpha_f = self.parameters['c_sl'] - beta_f*self.parameters['temp_sl']

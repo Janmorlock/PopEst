@@ -63,4 +63,4 @@ class EKF:
             self.temp_prev = u
 
         # MeasurementUpdate
-        self.est, self.var = self.model.update(self.r_ind, self.est, self.var, y)
+        # self.est, self.var = self.model.update(self.r_ind, self.est, self.var, y)

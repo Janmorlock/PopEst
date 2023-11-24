@@ -18,7 +18,7 @@ class ModParam:
         self.Lag = 3 # hours
         # TODO: Adapt min/max fluorescense values of the respective reactors
         # self.min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
-        self.min_fl = [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061] # [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]
+        self.min_fl = np.array([0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]).T # [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]
         self.max_fl = []
         self.minv = 0.059
         self.maxv = 0.290
@@ -38,6 +38,7 @@ class ModParam:
         self.c_sl = 0.16
         self.T_sh = 35
         self.c_sh = 0.005
+        self.gr_fp = np.array([0.17, 0.25, 0.22, 0.22, 0.24, 0.22, 0.004, 0.004]).T
 
         self.Lag_ind = int(self.Lag*3600/self.Ts) # Lag in indeces
 

@@ -9,6 +9,7 @@ from popSim import loadData, simulateFlProtein, interpolateCbToSim
 if __name__ == "__main__":    
     # SPECIFY DATA
     dataName = '062-4'
+    n_samples = 10000
     path, file_ind, sampcycle, titles = getCbDataInfo(dataName)
     dil_th = 0.54
     dil_am = 0.12
@@ -19,28 +20,49 @@ if __name__ == "__main__":
 
     param = ModParam()
 
+    param.gr_fp = np.random.uniform(0, 0.4, (n_samples,n_reactors)).T
+    param.min_fl = np.random.uniform(0, [cb_fl[r][0] for r in range(n_reactors)], (n_samples,n_reactors)).T
+
     # SIMULATE
-    sim_hrs, sim_fl, sim_dil = [], [], []
+    s_min = np.zeros(n_reactors, dtype=int)
+    sim_hrs, sim_fl, cb_dil = [], [], []
     for j in range(n_reactors):
+        print("Simulating temperature: ", titles[j])
         sim_hrs.append(np.arange(0,cb_hrs[j][-1]-cb_hrs[j][0],param.Ts/3600))
-        w1 = 1
-        fl_init = (cb_fl[j][0] - param.min_fl[j])*cb_od[j][0]/w1
-        # loc_max = argrelextrema(cb_od[j], np.greater)
-        # loc_min = argrelextrema(cb_od[j], np.less)
-        cb_dil = (np.diff(cb_p1[j], prepend=[0,0,0]) > 0.015)
-        # cb_od_max = (loc_max[] for k in (cb_dil[k] == 1))
-        sim_tem = np.full(len(sim_hrs[j]),tem[j])
+        dil = np.diff(cb_p1[j], prepend=[0,0]) > 0.015
+        cb_dil.append(dil[:-1])
+        # sim_tem = np.full(len(sim_hrs[j]),tem[j])
         # sim_tem = interpolateCbToSim(cb_hrs[j], cb_tem[j], sim_hrs[j])
         sim_od = interpolateCbToSim(cb_hrs[j], cb_od[j], sim_hrs[j])
-        sim_dil.append(interpolateCbToSim(cb_hrs[j], cb_dil, sim_hrs[j],'zero'))
-        sim_fl.append(simulateFlProtein(fl_init, sim_od, sim_tem, sim_dil[j], dil_am, dil_th)/sim_od*w1)
+        # param.min_fl[j][cb_fl[j][0] - param.min_fl[j] < 0] = cb_fl[j][0]
+        fl_init = (cb_fl[j][0] - param.min_fl[j])*(cb_od[j][0]+0.2)
+        sim_fp = simulateFlProtein(fl_init, cb_hrs[j], sim_hrs[j], sim_od, cb_dil[j], dil_am, dil_th, j, param).T
+        sim_fl.append(((sim_fp/(cb_od[j]+0.2)).T+param.min_fl[j]).T)
+        rmse = np.sqrt(np.mean((sim_fl[j] - cb_fl[j])**2,axis=1))
+        s_min[j] = np.argmin(rmse)
+    param.gr_fp = np.array([param.gr_fp[j][s_min[j]] for j in range(n_reactors)])
+    print("Growth rates:")
+    print(*param.gr_fp, sep = ", ")
+    print("Min Fl:")
+    print(*[param.min_fl[j][s_min[j]] for j in range(n_reactors)], sep = ", ")
 
+    gr_model3 = np.poly1d(np.polyfit(tem, param.gr_fp, 3))
+    gr_model4 = np.poly1d(np.polyfit(tem, param.gr_fp, 4))
+    print("Growth rate model:")
+    print(*gr_model3.coefficients, sep = ", ")
+    print(*gr_model4.coefficients, sep = ", ")
+    x_mod = np.linspace(param.temp_l, param.temp_h, 100)
 
     # ANALYSIS
-    # plotGrowthRates()
+    fig, ax = plt.subplots()
+    ax.plot(tem, param.gr_fp, 'o', label = 'data')
+    ax.plot(x_mod, gr_model3(x_mod), '-', label = '3rd order poly')
+    ax.plot(x_mod, gr_model4(x_mod), '-', label = '4th order poly')
+    plt.legend(loc='best')
+    fig.savefig("Images/062-4/gr_model.png")
 
     n_rows = math.ceil(n_reactors/2)
-    fig, ax = plt.subplots(n_rows,2,sharey='all')
+    fig, ax = plt.subplots(n_rows,2,sharey='row')
     fig.set_figheight(n_rows*7)
     fig.set_figwidth(20)
     for j in range(n_reactors):
@@ -52,10 +74,13 @@ if __name__ == "__main__":
         ax[r][c].patch.set_visible(False)
 
         axr.plot(cb_hrs[j],cb_tem[j],'r',lw=1)
-        ax[r][c].plot(cb_hrs[j],cb_fl[j],'.k',markersize = 0.8, label = '$(fl-fl_{min})$')
-        ax[r][c].plot(sim_hrs[j],sim_fl[j]+param.min_fl[j],'m',lw = 0.5, label = '$(fl_{sim}-fl_{min})$')
-        ax[r][c].plot(cb_hrs[j],cb_od[j],'g',lw = 0.5, label = 'p. putida od')
-        ax[r][c].vlines(sim_hrs[j][sim_dil[j]==1],-2,2,'g',lw = 0.5, alpha=0.5, label = 'p. putida dil')
+        ax[r][c].plot(cb_hrs[j],sim_fl[j][0],'k',lw = 0.5, label = '$(fl_{sim}-fl_{min})$ train', alpha = 0.1)
+        for s in range(1,min(n_samples,100)):
+            ax[r][c].plot(cb_hrs[j],sim_fl[j][s],'k',lw = 0.5, alpha = 0.1)
+        ax[r][c].plot(cb_hrs[j],sim_fl[j][s_min[j]],'m', lw = 0.5, label = '$(fl_{sim}-fl_{min})$ opt')
+        ax[r][c].plot(cb_hrs[j],cb_fl[j],'.g',markersize = 0.8, label = '$(fl-fl_{min})$ meas')
+        # ax[r][c].plot(cb_hrs[j],cb_od[j],'g',lw = 0.5, label = 'p. putida od')
+        # ax[r][c].vlines(cb_hrs[j][cb_dil[j]==1],-2,2,'g',lw = 0.5, alpha=0.5, label = 'p. putida dil')
         # ax[j].plot(cb_hrs[j],cb_od[j]*100,'--m',lw = 0.5, label = 'od')
 
         ax[r][c].legend(loc="upper left")
@@ -80,7 +105,7 @@ if __name__ == "__main__":
                 color='w',
                 bbox={'facecolor': 'red', 'alpha': 1, 'pad': 0, 'edgecolor': 'r'})
         ax[r][c].set_xlim([sim_hrs[j][0]-0.5,sim_hrs[j][-1]+0.5])
-        ax[r][c].set_ylim([-0.05,1])
+        # ax[r][c].set_ylim([-0.05,1])
         axr.set_ylim([25,38])
         ax[r][c].set_title(titles[j])
     # TODO: Set titles

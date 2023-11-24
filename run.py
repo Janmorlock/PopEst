@@ -154,8 +154,7 @@ if __name__ == "__main__":
         ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.k',markersize = 0.8, label = '$fl*100$')
         ax[r][c].plot(cbData.time_h[j],(fp/od + model.parameters['min_fl'][j])*100,'m',lw = 0.5, label = '$fl_{sim}*100$')
         ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.5, label = '$od_{sim}$*100')
-        ax[r][c].fill_between(cbData.time_h[j], p_puti_percent-p_puti_per_sigma, p_puti_percent+p_puti_per_sigma, color='g',alpha=0.2)
-        # ax[r][c].plot(cbData.time_h[j],cbData.od[j]*100,'.m',markersize = 0.8, label = 'od')
+        # ax[r][c].fill_between(cbData.time_h[j], p_puti_percent-p_puti_per_sigma, p_puti_percent+p_puti_per_sigma, color='g',alpha=0.2)
 
         ax[r][c].legend(loc="upper left")
         if (j%2 == 0):
@@ -187,4 +186,4 @@ if __name__ == "__main__":
     results_dir = "Images/{}".format(data_name)
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_fl_new.svg".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''))
+    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_fl_pred_old.svg".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''))

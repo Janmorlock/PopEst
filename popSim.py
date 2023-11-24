@@ -94,15 +94,24 @@ def simulateCultures(e_init, p_init, cb_hrs, sim_hrs, sim_tem_e, sim_tem_p, para
     return x
 
 
-def simulateFlProtein(flp_init, p_puti, temp, dil, dil_am ,dil_th):
-    fl_arr = np.empty_like(p_puti)
-    fl_p = FlProtein(flp_init)
-    for i in range(len(p_puti)):
-        fl_arr[i] = fl_p.count
-        fl_p.produce(p_puti[i],temp[i])
-        if dil[i]:
-            fl_p.dilute(dil_am, dil_th)
-    return fl_arr
+def simulateFlProtein(flp_init, cb_hrs, sim_hrs, p_puti, dil, dil_am ,dil_th, r_ind, parameters):
+    data_l = len(cb_hrs)
+    n_s = len(parameters.gr_fp[0])
+    x = np.zeros((data_l,n_s))
+    x_curr = flp_init
+    k = 0
+
+    for i in range(len(sim_hrs)):
+        if sim_hrs[i] >= cb_hrs[k]:
+            x[k] = x_curr
+            if dil[k]:
+                x_curr -= dil_am/dil_th*x_curr
+            # log
+            k += 1
+        x_curr = x_curr + parameters.Ts/3600*parameters.gr_fp[r_ind]*p_puti[i]
+    
+    x[k] = x_curr
+    return x
 
 
 def loadData(path, file_ind, scope, n_reactors):
