@@ -12,20 +12,20 @@ class CustModel:
         self.parameters['dil_amount'] = self.parameters['zig']*(1.5 + 1)
         self.parameters['lag_ind'] = int(self.parameters['lag']*3600/self.parameters['ts']) # Lag indeces
         self.parameters['r'] = np.diag([self.parameters['sigma_fl']**2, self.parameters['sigma_od']**2])
-        self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
+        self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2, self.parameters['sigma_fl_ofs']**2])
 
         self.temps = np.array([np.full(self.parameters['lag_ind']+1,self.parameters['temp_h']),
                                np.full(self.parameters['lag_ind']+1,self.parameters['temp_l'])])
         self.ts = self.parameters['ts']
 
-        self.A_dil = np.zeros((3,3))
-        self.L_dil = np.eye(3)
-        self.Q_dil = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
+        self.A_dil = np.eye(4)
+        self.L_dil = np.eye(4,3)
+        self.parameters['q_dil'] = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
 
-        self.A = np.zeros((3,3))
-        self.L = np.eye(3)
+        self.A = np.eye(4)
+        self.L = np.eye(4)
 
-        self.H = np.zeros((2,3))
+        self.H = np.zeros((2,4))
         self.M = np.eye(2)
 
     def initialize(self, j, n_reactors):
@@ -50,12 +50,13 @@ class CustModel:
     
         # REPLACE BELOW WITH LOGIC TO CALCULATE INITIAL STATE
         # NOTE: KEYS FOR x0 MATCH 'states' LIST ABOVE
-        temps = np.full((self.parameters['lag_ind']+1,2),[self.parameters['temp_h'],self.parameters['temp_l']]).T
+        temps = np.full((self.parameters['lag_ind']+1,2),[self.parameters['temp_h'],self.parameters['temp_l']],dtype='float').T
         self.temps = np.full((n_reactors,temps.shape[0],temps.shape[1]),temps)
         x0 = {  # Initial state
             'e': self.parameters['od_init']*self.parameters['e_rel_init'],
             'p': self.parameters['od_init']*(1-self.parameters['e_rel_init']),
-            'fp': (self.parameters['fl_init']-self.parameters['min_fl'][j])*self.parameters['od_init'],
+            'fp': (self.parameters['fl_init']-self.parameters['fl_ofs'][j])*(self.parameters['od_init']+self.parameters['od_ofs']),
+            'fl_ofs': self.parameters['fl_ofs_init'][j],
         }
 
         return x0
@@ -83,7 +84,7 @@ class CustModel:
         x_pred, p_pred = self.dilute(x_prev, p_prev)
 
         # Approximate abundance and their varaince after dt seconds of growth
-        temp = np.full(3,u)
+        temp = np.full(3,u,dtype='float')
         for i in range(round(dt/self.ts)):
             # Modifiy temperature
             self.temps[r_ind] = np.append(self.temps[r_ind,:,1:],np.full((2,1),u),axis=1)
@@ -106,14 +107,23 @@ class CustModel:
     def update(self, r_ind, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray) -> Tuple[dict, np.ndarray]:
         x_pred = np.fromiter(x_pred_dic.values(),dtype=float)
         od = x_pred[0] + x_pred[1]
-        self.H = np.array([[-x_pred[2]/od**2, -x_pred[2]/od**2, 1/od],
+        self.H = np.array([[-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])],
                            [1, 1, 0]])
         # K = np.linalg.solve(self.H @ p_pred.T @ self.H.T + self.M @ self.parameters['r'].T @ self.M.T, self.H @ p_pred.T).T
         K = p_pred @ self.H.T @ np.linalg.inv(self.H @ p_pred @ self.H.T + self.M @ self.parameters['r'] @ self.M.T)
-        y_est = np.array([x_pred[2]/od + self.parameters['min_fl'][r_ind], od])
+        y_est = np.array([x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind], od])
         xm = x_pred + K @ (y - y_est)
         xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
         Pm = (np.eye(3) - K @ self.H) @ p_pred
+
+        if xm[0] < 0:
+            xm[1] += xm[0]
+            xm[0] = 1e-4
+        if xm[1] < 0:
+            xm[0] += xm[1]
+            xm[1] = 1e-4
+        if xm[2] < 0:
+            xm[2] = 1e-4
 
         return dict(zip(x_pred_dic, xm)), Pm
     
@@ -123,16 +133,7 @@ class CustModel:
         """
         gr_e = self.parameters['beta_e']*temp[0] + self.parameters['alpha_e']
         gr_p = self.parameters['del_p']*temp[1]**3 + self.parameters['gam_p']*temp[1]**2 + self.parameters['beta_p']*temp[1] + self.parameters['alpha_p']
-        # gr_f = self.parameters['gr_fp'][0]*temp[2]**4 + self.parameters['gr_fp'][1]*temp[2]**3 + self.parameters['gr_fp'][2]*temp[2]**2 + self.parameters['gr_fp'][3]*temp[2] + self.parameters['gr_fp'][4]
-
-        beta_f = (self.parameters['c_sl'] - self.parameters['c_sh'])/(self.parameters['temp_sl'] - self.parameters['temp_sh'])
-        alpha_f = self.parameters['c_sl'] - beta_f*self.parameters['temp_sl']
-        gr_f = beta_f*temp[2] + alpha_f
-        if gr_f.size > 1:
-            gr_f[gr_f<self.parameters['c_sh']] = self.parameters['c_sh']
-            gr_f[gr_f>self.parameters['c_sl']] = self.parameters['c_sl']
-        else:
-            gr_f = max(self.parameters['c_sh'], gr_f)
-            gr_f = min(self.parameters['c_sl'], gr_f)
+        gr_f = self.parameters['gr_fp'][0]*temp[2]**2 + self.parameters['gr_fp'][1]*temp[2] + self.parameters['gr_fp'][2]
+        gr_f = max(0,gr_f)
 
         return np.array([gr_e, gr_p, gr_f])

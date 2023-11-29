@@ -21,17 +21,19 @@ class Params:
             'od_init' : 0.25, # initial belief optical density
             'e_rel_init' : 0.5, # %, initial relative belief of e. coli abundance
             'fl_init' : 0.2, # initial belief of fluorescence
+            'fl_ofs_init' : [0.06681171028640953, 0.10124284006186575, 0.012420329020951698, 0.09948044745557398, 0.08938092574497708, 0.11260643351414071, 0.05869055434532918, 0.048870744085821975],
 
             'sigma_e_init' : 0.01,
             'sigma_p_init' : 0.01,
             'sigma_fp_init' : 0.07,
+            'sigma_fl_ofs_init' : 0.07,
 
             'avg_temp' : True,
             'lag' : 3, # hours
             'lag_ind' : 0, # Lag indeces
-            # 'min_fl' : [0.06681911858766822, 0.10092813517299981, 0.036706517103062705, 0.09824800951992305, 0.08935696216429849, 0.11279752402152422, 0.06290159139625404, 0.050540617661143504],
             'min_fl' : [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061],
             'max_fl' : [0.280, 0.408, 0.355, 0.375, 0.323, 0.391, 0.297, 0.310],
+            'od_ofs' : 0.2,
 
             # Linear line fitting to 062_5 data (without 36°C)
             'beta_e' : 0.08388, # -0.45
@@ -44,21 +46,19 @@ class Params:
             'alpha_p' : 20.74,
 
             # Pw linear model for fluorescent protein dynamcs
-            'temp_sl' : 33,
-            'c_sl' : 0.16,
-            'temp_sh' : 35,
-            'c_sh' : 0.005,
-            'gr_fp' : [0.000193358172191664, -0.02344361901656315, 1.0521220115703511, -20.72204666758777, 151.45884447928148],
+            'gr_fp' : [-0.00997995390810818, 0.5878457848575587, -8.328492791512256],
 
 
             # Process noise standard deviation
             'sigma_e_dil' : 5e-3,
             'sigma_p_dil' : 5e-3,
             'sigma_fp_dil' : 5e-3,
+            'q_dil' : np.zeros((3,3)),
             'sigma_e' : 1e-4,
             'sigma_p' : 1e-4,
             'sigma_fp' : 1e-1,
-            'q' : np.zeros((3,3)),
+            'sigma_fl_ofs' : 1e-1,
+            'q' : np.zeros((4,4)),
 
             # Measurement noise standard deviation
             'sigma_od' : 5e-1,

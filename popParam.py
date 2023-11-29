@@ -11,17 +11,21 @@ class ModParam:
         self.T_pre_e = 37
         self.T_pre_p = 26
 
-        self.Dil_th = 0.51
-        self.Dil_amount = 0.02
+        self.dil_th = 0.54
+        self.dil_amount = 0.11
         self.Dil_sp = 0.5
         self.Avg_temp = True
         self.Lag = 3 # hours
         # TODO: Adapt min/max fluorescense values of the respective reactors
         # self.min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
-        self.min_fl = np.array([0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]).T # [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]
+        self.min_fl = np.array([0.06670286988458429, 0.09954091472779605, 0.01339878054716663, 0.09732706551691282, 0.08975873832801415, 0.1128096218942311, 0.061012361789911165, 0.04765733175961176]).T # [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]
         self.max_fl = []
         self.minv = 0.059
         self.maxv = 0.290
+
+        self.od_ofs = np.array([0.2])
+        self.n_samples = 10000
+        self.mcmc = True
 
         # Linear line fitting to 062_5 data (without 36°C)
         self.Beta_e = np.array([0.08388]) # -0.45
@@ -34,11 +38,12 @@ class ModParam:
         self.Alpha_p = np.array([20.74])
 
         # Pw linear model for fluorescent protein dynamcs
-        self.T_sl = 33
-        self.c_sl = 0.16
-        self.T_sh = 35
-        self.c_sh = 0.005
-        self.gr_fp = np.array([0.17, 0.25, 0.22, 0.22, 0.24, 0.22, 0.004, 0.004]).T
+        self.Del_fp = np.array([0.0])
+        self.Gam_fp = np.array([-0.010030269158100553])
+        self.Beta_fp = np.array([0.5909218418486065])
+        self.Alpha_fp = np.array([-8.374536265928038])
+        self.gr_fp = np.zeros(1,dtype='float')
+                          
 
         self.Lag_ind = int(self.Lag*3600/self.Ts) # Lag in indeces
 
@@ -85,6 +90,14 @@ def getCbDataInfo(dataName):
             # Sampcycle indices as in Matlab
             sampcycle = np.array([[0,1400] for i in range(n_reactors)])
             titles = ['26','27','29','30','31','33','35','37']
+        case '062-5':
+            path = '../../Ting/Experiments/062-5'
+            # Indeces of files of interest
+            file_ind = [4,5,6,7]
+            n_reactors = len(file_ind)
+            # Sampcycle indices as in Matlab
+            sampcycle = np.array([[0,1400] for i in range(n_reactors)])
+            titles = ['34','35','36','37']
         case _:
             raise Exception('Data information of {} not given.'.format(dataName))
     

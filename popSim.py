@@ -60,7 +60,9 @@ def dilute(x_curr, parameters):
 
 def getGrowthRate(temp, parameters):
     gr = np.array([parameters.Beta_e*temp[0] + parameters.Alpha_e,
-          parameters.Del_p*temp[1]**3 + parameters.Gam_p*temp[1]**2 + parameters.Beta_p*temp[1] + parameters.Alpha_p]).T
+          parameters.Del_p*temp[1]**3 + parameters.Gam_p*temp[1]**2 + parameters.Beta_p*temp[1] + parameters.Alpha_p,
+          parameters.Gam_fp*temp[2]**2 + parameters.Beta_fp*temp[2] + parameters.Alpha_fp])
+    gr[gr < 0] = 0
     return gr
             
 
@@ -88,15 +90,15 @@ def simulateCultures(e_init, p_init, cb_hrs, sim_hrs, sim_tem_e, sim_tem_p, para
             k += 1
         
         # Let them grow
-        x_curr *= 1 + parameters.Ts/3600*getGrowthRate([sim_tem_e[i],sim_tem_p[i]], parameters)
+        x_curr *= 1 + parameters.Ts/3600*getGrowthRate([sim_tem_e[i],sim_tem_p[i],0], parameters)[0:2].T
     
     x[k,:,:] = x_curr
     return x
 
 
-def simulateFlProtein(flp_init, cb_hrs, sim_hrs, p_puti, dil, dil_am ,dil_th, r_ind, parameters):
+def simulateFlProtein(flp_init, cb_hrs, sim_hrs, cb_temp, p_puti, dil, r_ind, parameters):
     data_l = len(cb_hrs)
-    n_s = len(parameters.gr_fp[0])
+    n_s = parameters.n_samples if parameters.mcmc else 1
     x = np.zeros((data_l,n_s))
     x_curr = flp_init
     k = 0
@@ -105,10 +107,13 @@ def simulateFlProtein(flp_init, cb_hrs, sim_hrs, p_puti, dil, dil_am ,dil_th, r_
         if sim_hrs[i] >= cb_hrs[k]:
             x[k] = x_curr
             if dil[k]:
-                x_curr -= dil_am/dil_th*x_curr
-            # log
+                x_curr -= parameters.dil_amount/parameters.dil_th*x_curr
             k += 1
-        x_curr = x_curr + parameters.Ts/3600*parameters.gr_fp[r_ind]*p_puti[i]
+            # log
+        if parameters.mcmc:
+            x_curr = x_curr + parameters.Ts/3600*parameters.gr_fp[r_ind]*p_puti[i]
+        else:
+            x_curr = x_curr + parameters.Ts/3600*getGrowthRate([0,0,cb_temp[k-1]], parameters)[2]*p_puti[i]
     
     x[k] = x_curr
     return x

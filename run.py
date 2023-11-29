@@ -69,6 +69,7 @@ if __name__ == "__main__":
     cbParam = CbDataParam(data_name)
     cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
     # Initialize the estimator
+    model_pred = CustModel()
     if (filter == 'ucf'):
         model = CustProgModel()
     elif (filter == 'ekf'):
@@ -76,19 +77,21 @@ if __name__ == "__main__":
     else:
         raise Exception("Invalid filter type")
 
-    # plotGrowthRates(expParam)
     critTemp = getCritTemp()[0]
-    # assert(26 < critTemp and critTemp < 37)
+    assert(26 < critTemp and critTemp < 37)
 
     # reactor, time, state
+    estimates_pred = [[] for j in range(cbParam.n_reactors)]
     estimates = [[] for j in range(cbParam.n_reactors)]
     variances = [[] for j in range(cbParam.n_reactors)]
     for j in range(cbParam.n_reactors):
+        x0_pred = model_pred.initialize(j,cbParam.n_reactors)
         x0 = model.initialize(j,cbParam.n_reactors)
         # Turn into a distribution - this represents uncertainty in the initial state
         # Construct covariance matrix (making sure each value is positive)
         cov = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
         # Construct State estimator
+        est_pred = EKF(model_pred, j, x0_pred, cov, update = False)
         if (filter == 'ucf'):
             est = UnscentedKalmanFilter(model, x0, dt = 1, Q = model.parameters['q'], R = model.parameters['r'])
             x0 = MultivariateNormalDist(x0.keys(), x0.values(), cov)
@@ -96,6 +99,9 @@ if __name__ == "__main__":
             est = EKF(model, j, x0, cov)
         for k in range(len(cbData.time[j])):
             # Run the filter
+            u_pred = cbData.temp[j][k]
+            est_pred.estimate(cbData.time[j][k], u_pred)
+            estimates_pred[j].append(est_pred.est)
             if (filter == 'ucf'):
                 u = model.InputContainer({'temp': cbData.temp[j][k]})
                 measurements = model.OutputContainer({'fl': cbData.fl[j][k], 'od': cbData.od[j][k]})
@@ -129,12 +135,17 @@ if __name__ == "__main__":
         r = j//2
         c = j%2
         # j = 1
+        e_coli_pred = np.array([estimates_pred[j][k]['e'] for k in range(len(estimates[j]))])
+        p_puti_pred = np.array([estimates_pred[j][k]['p'] for k in range(len(estimates[j]))])
+        fp_pred = np.array([estimates_pred[j][k]['fp'] for k in range(len(estimates[j]))])
+        od_pred = e_coli_pred + p_puti_pred
+        p_puti_pred_percent = p_puti_pred/od_pred*100
+
         e_coli = np.array([estimates[j][k]['e'] for k in range(len(estimates[j]))])
         p_puti = np.array([estimates[j][k]['p'] for k in range(len(estimates[j]))])
         var = np.array([variances[j][k][:2,:2] for k in range(len(variances[j]))])
         fp = np.array([estimates[j][k]['fp'] for k in range(len(estimates[j]))])
         od = e_coli + p_puti
-        e_coli_percent = e_coli/od*100
         p_puti_percent = p_puti/od*100
         sq = e_coli**2/p_puti**2*var[:,1,1] + var[:,0,0] - 2*e_coli/p_puti*np.sign(var[:,0,1])*np.sqrt(np.abs(var[:,0,1]))
         p_puti_per_sigma = np.abs(p_puti_percent/(e_coli+p_puti))*np.sqrt(np.abs(sq))
@@ -144,16 +155,17 @@ if __name__ == "__main__":
         axr.set_zorder(1)
         ax[r][c].patch.set_visible(False)
 
-        axr.plot(cbData.time_h[j],cbData.temp[j],'--r',lw=0.5,alpha=0.4)
+        axr.plot(cbData.time_h[j],cbData.temp[j],'--r',lw=0.5,alpha=0.5)
         # axr.plot(cbData.time_h[j],sim_tem_e[j],'r',lw=1)
         axr.hlines(critTemp,cbData.time_h[j][0]-1,cbData.time_h[j][-1]+1,'r',lw=0.5)
-        # ax[r][c].plot(cbData.time_h[j],e_coli_percent, 'b', label = 'e coli. sim')
-        ax[r][c].plot(cbData.time_h[j],p_puti_percent, 'g', label = 'p. putida sim')
-        # ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],cbParam.cb_fc_ec[j], 'b--x', label = 'e coli. fc')
-        ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],100-cbParam.cb_fc_ec[j], 'gx', markersize = 10, label = 'p. putida fc')
-        ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.k',markersize = 0.8, label = '$fl*100$')
-        ax[r][c].plot(cbData.time_h[j],(fp/od + model.parameters['min_fl'][j])*100,'m',lw = 0.5, label = '$fl_{sim}*100$')
-        ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.5, label = '$od_{sim}$*100')
+        ax[r][c].plot(cbData.time_h[j],(cbData.fl[j]-model.parameters['min_fl'][j])/(model.parameters['max_fl'][j]-model.parameters['min_fl'][j])*100,'.g',markersize = 0.8, alpha = 0.5, label = '$puti_{est,old}$')
+        ax[r][c].plot(cbData.time_h[j],p_puti_pred_percent, '--g', lw = 0.8, label = '$puti_{pred}$')
+        ax[r][c].plot(cbData.time_h[j],p_puti_percent, 'g', lw = 1.2, label = '$puti_{est}$')
+        ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],100-cbParam.cb_fc_ec[j], 'gx', markersize = 10, label = '$puti_{fc}$')
+        ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'--m',lw = 0.8, label = '$fl_{pred}*100$')
+        ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'m',lw = 0.8, label = '$fl_{est}*100$')
+        ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.k',markersize = 0.8, label = '$fl_{meas}*100$')
+        ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.4, label = '$od_{est}*100$')
         # ax[r][c].fill_between(cbData.time_h[j], p_puti_percent-p_puti_per_sigma, p_puti_percent+p_puti_per_sigma, color='g',alpha=0.2)
 
         ax[r][c].legend(loc="upper left")
@@ -186,4 +198,4 @@ if __name__ == "__main__":
     results_dir = "Images/{}".format(data_name)
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_fl_pred_old.svg".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''))
+    fig.savefig(results_dir+"/{}_{}r_{}h{}lag.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''))

@@ -9,7 +9,7 @@ class EKF:
     estParam : EstConst
         Estimation constants
     """
-    def __init__(self, model, r_ind, x0, p0: np.ndarray):
+    def __init__(self, model, r_ind, x0, p0: np.ndarray, update: bool = True):
         """
         Initialize the estimator. Sets the mean and covariance of the initial
         estimate.
@@ -26,8 +26,9 @@ class EKF:
         self.est = x0
         self.var = p0
         self.r_ind = r_ind
+        self.update = update
 
-    def estimate(self, time: float, u: float, y: np.ndarray):
+    def estimate(self, time: float, u: float, y: np.ndarray = np.zeros(0)):
         """
         Perform prediction step of the states of the system using the extended Kalman filter.
 
@@ -63,4 +64,5 @@ class EKF:
             self.temp_prev = u
 
         # MeasurementUpdate
-        # self.est, self.var = self.model.update(self.r_ind, self.est, self.var, y)
+        if self.update:
+            self.est, self.var = self.model.update(self.r_ind, self.est, self.var, y)
