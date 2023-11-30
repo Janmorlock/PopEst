@@ -68,7 +68,8 @@ if __name__ == "__main__":
     filter = 'ekf'
     cbParam = CbDataParam(data_name)
     cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
-    # Initialize the estimator
+
+    # Initialize the model
     model_pred = CustModel()
     if (filter == 'ucf'):
         model = CustProgModel()
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     critTemp = getCritTemp()[0]
     assert(26 < critTemp and critTemp < 37)
 
-    # reactor, time, state
+    # dim = reactor, time, state
     estimates_pred = [[] for j in range(cbParam.n_reactors)]
     estimates = [[] for j in range(cbParam.n_reactors)]
     variances = [[] for j in range(cbParam.n_reactors)]
@@ -89,12 +90,15 @@ if __name__ == "__main__":
         x0 = model.initialize(j,cbParam.n_reactors)
         # Turn into a distribution - this represents uncertainty in the initial state
         # Construct covariance matrix (making sure each value is positive)
-        cov = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
+        cov = np.diag([model.parameters['sigma_e_init']**2,
+                       model.parameters['sigma_p_init']**2,
+                       (model.parameters['fp_init']*model.parameters['unc_fp_init'])**2,
+                       (model.parameters['fl_ofs_init'][j]*model.parameters['unc_fl_ofs_init'])**2])
         # Construct State estimator
         est_pred = EKF(model_pred, j, x0_pred, cov, update = False)
         if (filter == 'ucf'):
-            est = UnscentedKalmanFilter(model, x0, dt = 1, Q = model.parameters['q'], R = model.parameters['r'])
             x0 = MultivariateNormalDist(x0.keys(), x0.values(), cov)
+            est = UnscentedKalmanFilter(model, x0, dt = 1, Q = model.parameters['q'], R = model.parameters['r'])
         elif (filter == 'ekf'):
             est = EKF(model, j, x0, cov)
         for k in range(len(cbData.time[j])):
@@ -143,8 +147,9 @@ if __name__ == "__main__":
 
         e_coli = np.array([estimates[j][k]['e'] for k in range(len(estimates[j]))])
         p_puti = np.array([estimates[j][k]['p'] for k in range(len(estimates[j]))])
-        var = np.array([variances[j][k][:2,:2] for k in range(len(variances[j]))])
         fp = np.array([estimates[j][k]['fp'] for k in range(len(estimates[j]))])
+        fl_ofs = np.array([estimates[j][k]['fl_ofs'] for k in range(len(estimates[j]))])
+        var = np.array([variances[j][k][:2,:2] for k in range(len(variances[j]))])
         od = e_coli + p_puti
         p_puti_percent = p_puti/od*100
         sq = e_coli**2/p_puti**2*var[:,1,1] + var[:,0,0] - 2*e_coli/p_puti*np.sign(var[:,0,1])*np.sqrt(np.abs(var[:,0,1]))
@@ -156,16 +161,17 @@ if __name__ == "__main__":
         ax[r][c].patch.set_visible(False)
 
         axr.plot(cbData.time_h[j],cbData.temp[j],'--r',lw=0.5,alpha=0.5)
-        # axr.plot(cbData.time_h[j],sim_tem_e[j],'r',lw=1)
         axr.hlines(critTemp,cbData.time_h[j][0]-1,cbData.time_h[j][-1]+1,'r',lw=0.5)
+        ax[r][c].hlines(model.parameters['fl_ofs_init'][j]/2e-3,cbData.time_h[j][0],cbData.time_h[j][-1],'b', linestyles = 'dashed',lw=0.5, label = '$fl_{ofs,pred}/2e-3$')
+        ax[r][c].plot(cbData.time_h[j],fl_ofs/2e-3,'b',lw = 0.5, label = '$fl_{ofs,est}/2e-3$')
         ax[r][c].plot(cbData.time_h[j],(cbData.fl[j]-model.parameters['min_fl'][j])/(model.parameters['max_fl'][j]-model.parameters['min_fl'][j])*100,'.g',markersize = 0.8, alpha = 0.5, label = '$puti_{est,old}$')
         ax[r][c].plot(cbData.time_h[j],p_puti_pred_percent, '--g', lw = 0.8, label = '$puti_{pred}$')
         ax[r][c].plot(cbData.time_h[j],p_puti_percent, 'g', lw = 1.2, label = '$puti_{est}$')
         ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],100-cbParam.cb_fc_ec[j], 'gx', markersize = 10, label = '$puti_{fc}$')
-        ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'--m',lw = 0.8, label = '$fl_{pred}*100$')
-        ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'m',lw = 0.8, label = '$fl_{est}*100$')
+        ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs_init'][j])*100,'--m',lw = 0.8, label = '$fl_{pred}*100$')
+        ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + fl_ofs)*100,'m',lw = 0.8, label = '$fl_{est}*100$')
         ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.k',markersize = 0.8, label = '$fl_{meas}*100$')
-        ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.4, label = '$od_{est}*100$')
+        ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.5, alpha=0.5, label = '$od_{est}*100$')
         # ax[r][c].fill_between(cbData.time_h[j], p_puti_percent-p_puti_per_sigma, p_puti_percent+p_puti_per_sigma, color='g',alpha=0.2)
 
         ax[r][c].legend(loc="upper left")
@@ -198,4 +204,4 @@ if __name__ == "__main__":
     results_dir = "Images/{}".format(data_name)
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir+"/{}_{}r_{}h{}lag.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''))
+    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_4s.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''))

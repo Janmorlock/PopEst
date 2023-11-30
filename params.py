@@ -7,26 +7,10 @@ class Params:
             'temp_l' : 26,
             'temp_h' : 37,
 
-            'dil_dithered' : False,
-            # Dither values are calculated by:
-            # For a setpoint of 0.5, the highest point should be centre + zig (0.54) and the lowest point should be centre - zig*1.5 (0.44)
-            'zig' : 0.04, # (arbitrary value we use in the CB code)
             'od_setpoint' : 0.5,
-            'dil_th' : 0,
-            'dil_amount' : 0,
 
             'ts' : 1, # seconds
             'dt' : 1, # seconds
-
-            'od_init' : 0.25, # initial belief optical density
-            'e_rel_init' : 0.5, # %, initial relative belief of e. coli abundance
-            'fl_init' : 0.2, # initial belief of fluorescence
-            'fl_ofs_init' : [0.06681171028640953, 0.10124284006186575, 0.012420329020951698, 0.09948044745557398, 0.08938092574497708, 0.11260643351414071, 0.05869055434532918, 0.048870744085821975],
-
-            'sigma_e_init' : 0.01,
-            'sigma_p_init' : 0.01,
-            'sigma_fp_init' : 0.07,
-            'sigma_fl_ofs_init' : 0.07,
 
             'avg_temp' : True,
             'lag' : 3, # hours
@@ -35,9 +19,10 @@ class Params:
             'max_fl' : [0.280, 0.408, 0.355, 0.375, 0.323, 0.391, 0.297, 0.310],
             'od_ofs' : 0.2,
 
+            ### Growth rates
             # Linear line fitting to 062_5 data (without 36°C)
-            'beta_e' : 0.08388, # -0.45
-            'alpha_e' : -1.934, # 6.334
+            'beta_e' : 0.08388,
+            'alpha_e' : -1.934,
 
             # Cubic line fitting to 062_5 data
             'del_p' : -0.001184,
@@ -45,9 +30,21 @@ class Params:
             'beta_p' : -2.413,
             'alpha_p' : 20.74,
 
-            # Pw linear model for fluorescent protein dynamcs
+            # Cubic line fitting to 062_5 data
             'gr_fp' : [-0.00997995390810818, 0.5878457848575587, -8.328492791512256],
 
+            ### Kalman filter parameters
+            # Initial state
+            'od_init' : 0.25, # initial belief optical density
+            'e_rel_init' : 0.5, # %, initial relative belief of e. coli abundance
+            'fp_init' : 0.06, # initial belief of fluorescence protein
+            'fl_ofs_init' : [0.06681171028640953, 0.10124284006186575, 0.012420329020951698, 0.09948044745557398, 0.08938092574497708, 0.11260643351414071, 0.05869055434532918, 0.048870744085821975],
+
+            # Initial state standard deviation
+            'sigma_e_init' : 0.01,
+            'sigma_p_init' : 0.01,
+            'unc_fp_init' : 5e-2,
+            'unc_fl_ofs_init' : 1e-0,
 
             # Process noise standard deviation
             'sigma_e_dil' : 5e-3,
@@ -57,7 +54,7 @@ class Params:
             'sigma_e' : 1e-4,
             'sigma_p' : 1e-4,
             'sigma_fp' : 1e-1,
-            'sigma_fl_ofs' : 1e-1,
+            'sigma_fl_ofs' : 1e-5,
             'q' : np.zeros((4,4)),
 
             # Measurement noise standard deviation
