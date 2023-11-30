@@ -1,6 +1,4 @@
 from popParam import ModParam, getCbDataInfo, getFcData
-from bactCult import BactCult, FlProtein
-import growthRates as gR
 
 import pandas as pd
 import glob
@@ -8,6 +6,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import scipy.signal as ss
+from scipy.optimize import fsolve
+
+param = ModParam()
+
+def f(xy):
+    x, y = xy
+    gr = getGrowthRate(np.full(2,x),param)
+    z = np.array([y - gr[:,0][0],
+                  y - gr[:,1][0]])
+    return z
+
+def getCritTemp():
+    temp = fsolve(f, [33.0, 0.8])
+    return temp
+
+def plotGrowthRates(ax, parameters, label):
+    temp = np.full((2,11),np.arange(parameters.temp_l,parameters.temp_h,1))
+    gr = getGrowthRate(temp, parameters)
+    # critT = getCritTemp()[0]
+    ax.plot(temp[0],gr[:,0],"-x{}".format("k" if (label == "prior") else "b"),label="E coli. {}".format(label))
+    ax.plot(temp[0],gr[:,1],"-o{}".format("k" if (label == "prior") else "g"),label='P. Putida {}'.format(label))
+    # plt.plot(temp[0],gr[2],'-xk',label='Fl. Protein')
+    # ax.vlines(critT,0,1,colors='r',label='Critical Temperature')
+    return
 
 def interpolateCbToSim(cb_hrs, cb_data, sim_hrs, method='hold'):
     count = 0
@@ -25,55 +47,76 @@ def interpolateCbToSim(cb_hrs, cb_data, sim_hrs, method='hold'):
                 sim_data[i] = 0
     return sim_data
 
-def simulateCultures(e_init, p_init, sim_tem_e, sim_tem_p):
+def dilute(x_curr, parameters):
+    """
+    Take self.dil_am out of the reactor and update self.pop correspondingly.
+    """
+    # self.pop -= self.param.Dil_amount*self.pop/(self.pop + pop_other)
+    od = np.array([x_curr[:,0] + x_curr[:,1], x_curr[:,0] + x_curr[:,1]]).T
+    dil = od[:,0] > parameters.Dil_sp
+    # dil = 1 if od > parameters.Dil_sp else 0
+    x_curr[dil,:] = (2*parameters.Dil_sp/od[dil] - 1)*x_curr[dil,:]
+    return x_curr
+
+def getGrowthRate(temp, parameters):
+    gr = np.array([parameters.Beta_e*temp[0] + parameters.Alpha_e,
+          parameters.Del_p*temp[1]**3 + parameters.Gam_p*temp[1]**2 + parameters.Beta_p*temp[1] + parameters.Alpha_p,
+          parameters.Gam_fp*temp[2]**2 + parameters.Beta_fp*temp[2] + parameters.Alpha_fp])
+    gr[gr < 0] = 0
+    return gr
+            
+
+def simulateCultures(e_init, p_init, cb_hrs, sim_hrs, sim_tem_e, sim_tem_p, parameters):
     """
     Simulates one E coli. and P. Putida coculture using Euler forward discretization.
 
     Returns a time array with the corresponding values of the temperature and simulated population sizes.
     """
-    e_coli = BactCult("e", e_init)
-    p_puti = BactCult("p", p_init)
+    data_l = len(cb_hrs)
+    n_s = len(parameters.Alpha_e)
 
-    data_l = len(sim_tem_e)
+    x = np.zeros((data_l,n_s,2))
+    x_curr = np.full((n_s,2),[e_init, p_init])
 
-    sim_pop_e = np.empty(data_l)
-    sim_pop_p = np.empty(data_l)
-    sim_dil = np.empty(data_l)
-
+    k = 0
     # Update
-    for i in range(data_l):
-        # log
-        sim_pop_e[i] = e_coli.pop
-        sim_pop_p[i] = p_puti.pop
+    for i in range(len(sim_hrs)):
 
-        pop_e = e_coli.pop
-        pop_p = p_puti.pop
-        dil = 0
-
-        # Dilute if combined OD above threshold
-        if (pop_e + pop_p > param.Dil_th):
-            e_coli.dilute(pop_p)
-            p_puti.dilute(pop_e)
-            dil = 1
-
-        sim_dil[i] = dil
-            
+        if sim_hrs[i] >= cb_hrs[k]:
+            # log
+            x[k,:,:] = x_curr
+            # Dilute if combined OD above threshold
+            x_curr = dilute(x_curr, parameters)
+            k += 1
+        
         # Let them grow
-        e_coli.grow(sim_tem_e[i])
-        p_puti.grow(sim_tem_p[i])
+        x_curr *= 1 + parameters.Ts/3600*getGrowthRate([sim_tem_e[i],sim_tem_p[i],0], parameters)[0:2].T
     
-    return sim_pop_e, sim_pop_p, sim_dil
+    x[k,:,:] = x_curr
+    return x
 
 
-def simulateFlProtein(flp_init, p_puti, temp, dil, dil_am ,dil_th):
-    fl_arr = np.empty_like(p_puti)
-    fl_p = FlProtein(flp_init)
-    for i in range(len(p_puti)):
-        fl_arr[i] = fl_p.count
-        fl_p.produce(p_puti[i],temp[i])
-        if dil[i]:
-            fl_p.dilute(dil_am, dil_th)
-    return fl_arr
+def simulateFlProtein(flp_init, cb_hrs, sim_hrs, cb_temp, p_puti, dil, r_ind, parameters):
+    data_l = len(cb_hrs)
+    n_s = parameters.n_samples if parameters.mcmc else 1
+    x = np.zeros((data_l,n_s))
+    x_curr = flp_init
+    k = 0
+
+    for i in range(len(sim_hrs)):
+        if sim_hrs[i] >= cb_hrs[k]:
+            x[k] = x_curr
+            if dil[k]:
+                x_curr -= parameters.dil_amount/parameters.dil_th*x_curr
+            k += 1
+            # log
+        if parameters.mcmc:
+            x_curr = x_curr + parameters.Ts/3600*parameters.gr_fp[r_ind]*p_puti[i]
+        else:
+            x_curr = x_curr + parameters.Ts/3600*getGrowthRate([0,0,cb_temp[k-1]], parameters)[2]*p_puti[i]
+    
+    x[k] = x_curr
+    return x
 
 
 def loadData(path, file_ind, scope, n_reactors):
@@ -96,28 +139,30 @@ def loadData(path, file_ind, scope, n_reactors):
     cb_hrs = [cb_hrs[i]-cb_hrs[i][0] for i in range(n_reactors)]
     return cb_hrs, cb_od, cb_tem, cb_fl, cb_p1, cb_sp
 
-
 if __name__ == "__main__":
 
     # SPECIFY DATA
     dataName = '064-2'
+    n_samples = 10000
+    train_ind = [0,2,4,6]
+    test_ind = [1,3,5,7]
+    all_ind = train_ind+test_ind
+    n_reactors = len(all_ind)
     path, file_ind, sampcycle, titles = getCbDataInfo(dataName)
     cb_fc_ec = getFcData(dataName)
 
-    n_reactors = len(file_ind)
     cb_hrs, cb_od, cb_tem, cb_fl, cb_p1, cb_sp = loadData(path, file_ind, sampcycle, n_reactors)
 
-    param = ModParam()
+    fig, ax = plt.subplots()
+    plotGrowthRates(ax, param, "prior")
 
-    sim_tem_e, sim_tem_p, sim_hrs, e_coli_all, p_puti_all = [], [], [], [], []
-    fl_p_all = []
+    sim_tem_e, sim_tem_p, sim_hrs = [], [], []
+    p_rel_prior= []
     # SIMULATION
-    for j in range(n_reactors):
+    for i in range(n_reactors):
         # Collect inputs
-        sim_hrs.append(np.arange(0,cb_hrs[j][-1]-cb_hrs[j][0],param.Ts/3600))
-        sim_tem = interpolateCbToSim(cb_hrs[j], cb_tem[j], sim_hrs[j])
-        e_init = cb_fc_ec[j][0]*cb_od[j][0]/100
-        p_init = (100-cb_fc_ec[j][0])*cb_od[j][0]/100
+        sim_hrs.append(np.arange(0,cb_hrs[i][-1],param.Ts/3600))
+        sim_tem = interpolateCbToSim(cb_hrs[i], cb_tem[i], sim_hrs[i])
         if (param.Lag):
             tem_lag_e = np.concatenate((np.full(param.Lag_ind,param.T_pre_e),sim_tem))
             tem_lag_p = np.concatenate((np.full(param.Lag_ind,param.T_pre_p),sim_tem))
@@ -125,25 +170,71 @@ if __name__ == "__main__":
                 sim_tem_e.append(ss.convolve(tem_lag_e,np.full(param.Lag_ind+1,1/(param.Lag_ind+1)),mode='valid'))
                 sim_tem_p.append(ss.convolve(tem_lag_p,np.full(param.Lag_ind+1,1/(param.Lag_ind+1)),mode='valid'))
             else:
-                sim_tem_e.append(tem_lag_e[:len(sim_hrs[j])])
-                sim_tem_p.append(tem_lag_p[:len(sim_hrs[j])])
+                sim_tem_e.append(tem_lag_e[:len(sim_hrs[i])])
+                sim_tem_p.append(tem_lag_p[:len(sim_hrs[i])])
         else:
             sim_tem_e.append(sim_tem)
             sim_tem_p.append(sim_tem)
+
+        e_init = cb_fc_ec[i][0]*cb_od[i][0]/100
+        p_init = (100-cb_fc_ec[i][0])*cb_od[i][0]/100
         # Simulate cultures
-        sim_pop_e, sim_pop_p, sim_dil = simulateCultures(e_init, p_init, sim_tem_e[j], sim_tem_p[j])
-        e_coli_all.append(sim_pop_e)
-        p_puti_all.append(sim_pop_p)
-        fl_init = (cb_fl[j][0] - param.min_fl[file_ind[j]])*cb_od[j][0]
-        sim_od = interpolateCbToSim(cb_hrs[j], cb_od[j], sim_hrs[j])
-        fl_p_all.append(simulateFlProtein(fl_init, sim_pop_p, sim_tem, sim_dil, param.Dil_amount, param.Dil_th)/sim_od)
+        x = simulateCultures(e_init, p_init, cb_hrs[i], sim_hrs[i], sim_tem_e[i], sim_tem_p[i], param)
+        p_rel_prior.append(np.array(x[:,:,1])/(np.array(x[:,:,1])+np.array(x[:,:,0]))*100)
 
+    # Run multiple simulations with different growth rates
+    p_rel_train, fl_p_train = [], []
+    rmse = np.zeros((1,n_samples))
+    param.Alpha_e = np.random.normal(param.Alpha_e[0], 0.03*abs(param.Alpha_e[0]), n_samples)
+    param.Beta_e = np.random.normal(param.Beta_e[0], 0.05*abs(param.Beta_e[0]), n_samples)
+    param.Alpha_p = np.random.normal(param.Alpha_p[0], 0.03*abs(param.Alpha_p[0]), n_samples)
+    param.Beta_p = np.random.normal(param.Beta_p[0], 0.05*abs(param.Beta_p[0]), n_samples)
+    param.Gam_p = np.random.normal(param.Gam_p[0], 0.007*abs(param.Gam_p[0]), n_samples)
+    param.Del_p = np.random.normal(param.Del_p[0], 0.002*abs(param.Del_p[0]), n_samples)
+    for i in train_ind:
+        print("Training with reactor {}".format(titles[i]))
+        e_coli_samples, p_puti_samples = [], []
+        e_init = cb_fc_ec[i][0]*cb_od[i][0]/100
+        p_init = (100-cb_fc_ec[i][0])*cb_od[i][0]/100
+        # Simulate cultures
+        x = simulateCultures(e_init, p_init, cb_hrs[i], sim_hrs[i], sim_tem_e[i], sim_tem_p[i], param)
+        # Calculate RMSE
+        p_rel_train.append(np.array(x[:,:,1])/(np.array(x[:,:,1])+np.array(x[:,:,0]))*100)
+        rmse += np.sqrt(np.mean((p_rel_train[-1][sampcycle[i]-sampcycle[i][0],:].T - (100-cb_fc_ec[i]))**2,axis=1))
+        # fl_init = (cb_fl[i][0] - param.min_fl[file_ind[i]])*cb_od[i][0]
+        # sim_od = interpolateCbToSim(cb_hrs[i], cb_od[i], sim_hrs[i])
+        # fl_p_train.append(simulateFlProtein(fl_init, cb_pop_p, sim_tem, cb_dil, param.Dil_amount, param.Dil_th)/sim_od)
+    s_min = np.argmin(rmse)
 
-    gR.plotGrowthRates()
-    critTemp = gR.getCritTemp()
-    assert(26 < critTemp[0] and critTemp[0] < 37)
+    print("Best fit: \nself.Beta_e = np.array([{0:0.5f}]) \nself.Alpha_e =np.array([{1:0.5f}]) \nself.Del_p = np.array([{2:0.5f}]) \nself.Gam_p =  np.array([{3:0.5f}]) \nself.Beta_p = np.array([{4:0.5f}]) \nself.Alpha_p = np.array([{5:0.5f}])".format(param.Beta_e[s_min], param.Alpha_e[s_min], param.Del_p[s_min], param.Gam_p[s_min],param.Beta_p[s_min], param.Alpha_p[s_min]))
+
+    # Run multiple simulations with different growth rates
+    param.Alpha_e = np.array([param.Alpha_e[s_min]])
+    param.Beta_e = np.array([param.Beta_e[s_min]])
+    param.Alpha_p = np.array([param.Alpha_p[s_min]])
+    param.Beta_p = np.array([param.Beta_p[s_min]])
+    param.Gam_p = np.array([param.Gam_p[s_min]])
+    param.Del_p = np.array([param.Del_p[s_min]])
+    p_rel_test= []
+    print("Testing...")
+    for i in test_ind:
+        e_init = cb_fc_ec[i][0]*cb_od[i][0]/100
+        p_init = (100-cb_fc_ec[i][0])*cb_od[i][0]/100
+        # Simulate cultures
+        x = simulateCultures(e_init, p_init, cb_hrs[i], sim_hrs[i], sim_tem_e[i], sim_tem_p[i], param)
+        p_rel_test.append(np.array(x[:,:,1])/(np.array(x[:,:,1])+np.array(x[:,:,0]))*100)
+
+    # critTemp = getCritTemp()
+    # assert(26 < critTemp[0] and critTemp[0] < 37)
+    plotGrowthRates(ax, param, "opt")
 
     # ANALYSIS
+    ax.set_xlim(param.temp_l-1,param.temp_h+1)
+    ax.set_xlabel("Temperature [°C]")
+    ax.set_ylabel("Growth Rate [$h^{-1}$]")
+    ax.legend()
+    fig.savefig("Images/{}/growthRates.png".format(dataName))
+
     # n_reactors = 1
     n_rows = math.ceil(n_reactors/2)
     n_culumns = 2 if n_reactors > 1 else 1
@@ -154,58 +245,72 @@ if __name__ == "__main__":
         ax = [ax]
     if n_rows == 1:
         ax = [ax]
-    for j in range(n_reactors):
-        r = j//2
-        c = j%2
-        # j = 1
-        od = e_coli_all[j] + p_puti_all[j]
-        e_coli_percent = e_coli_all[j]/od*100
-        p_puti_percent = p_puti_all[j]/od*100
-
-        axr = ax[r][c].twinx()
+    axr = [[]]*n_reactors
+    for i in range(n_reactors):
+        r = i//2
+        c = i%2
+        axr[i] = ax[r][c].twinx()
         ax[r][c].set_zorder(2)
-        axr.set_zorder(1)
+        axr[i].set_zorder(1)
         ax[r][c].patch.set_visible(False)
 
-        axr.plot(cb_hrs[j],cb_tem[j],'r',lw=0.5)
-        # axr.plot(sim_hrs[j],sim_tem_e[j],'r',lw=1)
-        # axr.hlines(critTemp[0],sim_hrs[j][0]-1,sim_hrs[j][-1]+1,'r',lw=0.5)
-        # ax[r][c].plot(sim_hrs[j],e_coli_percent, 'b', label = 'e coli. sim')
-        ax[r][c].plot(sim_hrs[j],p_puti_percent, 'k', label = 'p. putida sim')
-        # ax[r][c].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],cb_fc_ec[j], 'b--x', label = 'e coli. fc')
-        ax[r][c].plot(cb_hrs[j][sampcycle[j]-sampcycle[j][0]],100-cb_fc_ec[j], 'k--x', label = 'p. putida fc',lw=0.4)
-        ax[r][c].plot(cb_hrs[j],(cb_fl[j]-param.minv)/(param.maxv-param.minv)*100,'.g',markersize = 0.8, label = 'fluorescense measured')
-        ax[r][c].plot(sim_hrs[j],(fl_p_all[j]+param.min_fl[file_ind[j]])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
-        # ax[r][c].plot(time_all[j],od*100,'-k',lw = 0.5, label = 'od sim')
-        # ax[r][c].plot(cb_hrs[j],cb_od[j]*100,'--m',lw = 0.5, label = 'od')
-        ax[r][c].plot(cb_hrs[j],(cb_sp[j]-param.minv)/(param.maxv-param.minv)*100,'g--',markersize = 0.8, label = 'fluorescense setpoint')
-
-
-        ax[r][c].legend(loc="upper left")
-        if (j%2 == 0):
+        if (i%2 == 0):
             ax[r][c].set_ylabel("Relative composition [%]")
         else:
-            axr.set_ylabel('Temperature [°C]', color='r')
+            axr[i].set_ylabel('Temperature [°C]', color='r')
             ax[r][c].tick_params(axis='y', labelleft=True)
-        # axr.set_yticks(np.append(axr.get_yticks(), critTemp[0]))
-        axr.tick_params(axis='y', color='r', labelcolor='r')
-        axr.text(1, 1, 'e coli. prefered',
+        # axr[i].set_yticks(np.append(axr[i].get_yticks(), critTemp[0]))
+        axr[i].tick_params(axis='y', color='r', labelcolor='r')
+        axr[i].text(1, 1, 'e coli. prefered',
                 horizontalalignment='right',
                 verticalalignment='top',
-                transform=axr.transAxes,
+                transform=axr[i].transAxes,
                 color='w',
                 bbox={'facecolor': 'red', 'alpha': 1, 'pad': 0, 'edgecolor': 'r'})
-        axr.text(1, 0, 'p. putida prefered',
+        axr[i].text(1, 0, 'p. putida prefered',
                 horizontalalignment='right',
                 verticalalignment='bottom',
-                transform=axr.transAxes,
+                transform=axr[i].transAxes,
                 color='w',
                 bbox={'facecolor': 'red', 'alpha': 1, 'pad': 0, 'edgecolor': 'r'})
         ax[r][c].set_xlabel("Time [h]")
-        ax[r][c].set_xlim([sim_hrs[j][0]-0.5,sim_hrs[j][-1]+0.5])
+        ax[r][c].set_xlim([sim_hrs[i][0]-0.5,sim_hrs[i][-1]+0.5])
         ax[r][c].set_ylim([-5,105])
-        ax[r][c].set_title(titles[j])
+        ax[r][c].set_title(titles[i])
+
+    for j in range(len(train_ind)):
+        i = train_ind[j]
+        r = i//2
+        c = i%2
+
+        axr[i].plot(cb_hrs[i],cb_tem[i],'r',lw=0.5)
+        # axr.plot(sim_hrs[i],sim_tem_e[i],'r',lw=1)
+        # axr.hlines(critTemp[0],sim_hrs[i][0]-1,sim_hrs[i][-1]+1,'r',lw=0.5)
+        ax[r][c].plot(cb_hrs[i],p_rel_train[j][:,0], 'k', label = 'p. putida train', alpha=0.1, lw=0.5)
+        for s in range(1,min(n_samples,200)):
+            ax[r][c].plot(cb_hrs[i],p_rel_train[j][:,s], 'k', alpha=0.1, lw=0.5)
+        ax[r][c].plot(cb_hrs[i],p_rel_train[j][:,s_min], 'g', label = 'p. putida opt')
+        ax[r][c].plot(cb_hrs[i][sampcycle[i]-sampcycle[i][0]],100-cb_fc_ec[i], 'gx', label = 'p. putida fc',lw=0.4)
+        ax[r][c].plot(cb_hrs[i],p_rel_prior[i][:,0], '--g', label = 'p. putida prior')
+        # ax[r][c].plot(cb_hrs[i],(cb_fl[i]-param.minv)/(param.maxv-param.minv)*100,'.k',markersize = 0.8, label = 'fluorescense measured')
+        # ax[r][c].plot(sim_hrs[i],(fl_p_train[i]+param.min_fl[file_ind[i]])*100,'m',lw = 0.5, label = '$100*fl_{sim}$')
+        # ax[r][c].plot(time_all[i],od*100,'-k',lw = 0.5, label = 'od sim')
+        # ax[r][c].plot(cb_hrs[i],cb_od[i]*100,'--m',lw = 0.5, label = 'od')
+        # ax[r][c].plot(cb_hrs[i],(cb_sp[i]-param.minv)/(param.maxv-param.minv)*100,'g--',markersize = 0.8, label = 'fluorescense setpoint')
+        ax[r][c].legend(loc="upper left")
+    
+    for j in range(len(test_ind)):
+        i = test_ind[j]
+        r = i//2
+        c = i%2
+
+        axr[i].plot(cb_hrs[i],cb_tem[i],'r',lw=0.5)
+        ax[r][c].plot(cb_hrs[i],p_rel_test[j][:,0], 'g', label = 'p. putida opt')
+        ax[r][c].plot(cb_hrs[i][sampcycle[i]-sampcycle[i][0]],100-cb_fc_ec[i], 'gx', label = 'p. putida fc',lw=0.4)
+        ax[r][c].plot(cb_hrs[i],p_rel_prior[i][:,0], '--g', label = 'p. putida prior')
+        ax[r][c].legend(loc="upper left")
+
     # TODO: Set titles
     fig.suptitle(dataName)
     fig.tight_layout()
-    fig.savefig("Images/{}/{}r_{}h{}lag_fl_new.svg".format(dataName,n_reactors,param.Lag,'avg' if param.Avg_temp else ''))
+    fig.savefig("Images/{}/{}r_{}h{}lag_est_new.png".format(dataName,n_reactors,param.Lag,'avg' if param.Avg_temp else ''))

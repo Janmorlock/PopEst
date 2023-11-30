@@ -1,81 +1,66 @@
 import numpy as np
 import pandas as pd
 
-class ExpParam:
+class Params:
     def __init__(self):
-        self.T_l = 26
-        self.T_h = 37
+        self.default = {  # Set default parameters
+            'temp_l' : 26,
+            'temp_h' : 37,
 
-        self.T_pre_e = 37
-        self.T_pre_p = 26
+            'od_setpoint' : 0.5,
 
-        self.Dil_dithered = False
-        # Dither values are calculated by:
-        # sysData[M]['Zigzag']['target']=centre-zig*1.5
-        # centre = 0.5 (our OD setpoint)
-        # zig = 0.04 (arbitrary value we use in the code)
-        # For a setpoint of 0.5, the highest point should be centre + zig (0.54) and the lowest point should be centre - zig*1.5 (0.44)
-        self.zig = 0.04
-        self.Od_setpoint = 0.5
-        self.Dil_th = self.Od_setpoint + self.zig
-        self.Dil_amount = self.zig*(1.5 + 1)
-        
+            'ts' : 1, # seconds
+            'dt' : 1, # seconds
 
-class ModelParam:
-    def __init__(self):
-        self.Avg_temp = True
-        self.Lag = 3 # hours
-        # TODO: Adapt min/max fluorescense values of the respective reactors
-        # self.min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
-        self.min_fl = [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]
-        self.max_fl = [0.280, 0.408, 0.355, 0.375, 0.323, 0.391, 0.297, 0.310]
+            'od_init' : 0.25, # initial belief optical density
+            'e_rel_init' : 0.5, # %, initial relative belief of e. coli abundance
+            'fl_init' : 0.2, # initial belief of fluorescence
+
+            'sigma_e_init' : 0.01,
+            'sigma_p_init' : 0.01,
+            'sigma_fp_init' : 0.07,
+
+            'avg_temp' : True,
+            'lag' : 3, # hours
+            'lag_ind' : 0, # Lag indeces
+            'min_fl' : [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061],
+            'max_fl' : [0.280, 0.408, 0.355, 0.375, 0.323, 0.391, 0.297, 0.310],
+            'fl_ofs' : [0.06681171028640953, 0.10124284006186575, 0.012420329020951698, 0.09948044745557398, 0.08938092574497708, 0.11260643351414071, 0.05869055434532918, 0.048870744085821975],
+            'od_ofs' : 0.2,
 
 
-        # Linear line fitting to 062_5 data (without 36°C)
-        self.Del_e = 0
-        self.Gam_e =  0 # 0.008511
-        self.Beta_e = 0.08388 # -0.45
-        self.Alpha_e = -1.934 # 6.334
+            ### Growth rate parameters
+            # Linear line fitting to 062_5 data (without 36°C)
+            'beta_e' : 0.08388, # -0.45
+            'alpha_e' : -1.934, # 6.334
 
-        # Cubic line fitting to 062_5 data
-        self.Del_p = -0.001184
-        self.Gam_p =  0.09397
-        self.Beta_p = -2.413
-        self.Alpha_p = 20.74
+            # Cubic line fitting to 062_5 data
+            'del_p' : -0.001184,
+            'gam_p' :  0.09397,
+            'beta_p' : -2.413,
+            'alpha_p' : 20.74,
 
-        # Pw linear model for fluorescent protein dynamcs
-        self.T_sl = 33
-        self.c_sl = 0.16
-        self.T_sh = 35
-        self.c_sh = 0.005
-
-        # Process noise standard deviation
-        self.sigma_e_dil = 0.01
-        self.sigma_p_dil = 0.01
-        self.sigma_fp_dil = 0.01
-        self.sigma_e = 1e-3
-        self.sigma_p = 1e-3
-        self.sigma_fp = 1
-
-        # Measurement noise standard deviation
-        self.sigma_od = 1e-1
-        self.sigma_fl = 1e-2
+            # Cubic line fitting to 062_5 data
+            'gr_fp' : [-0.00997995390810818, 0.5878457848575587, -8.328492791512256],
 
 
-class EstParam:
-    def __init__(self):
-        self.Ts = 1 # seconds
-        self.num_states = 3
-        self.num_inputs = 1
-        self.num_outputs = 2
+            ### Parameters for the Kalman filter
+            # Process noise standard deviation
+            'sigma_e_dil' : 5e-3,
+            'sigma_p_dil' : 5e-3,
+            'sigma_fp_dil' : 5e-3,
+            'q_dil' : np.zeros((3,3)),
+            'sigma_e' : 1e-4,
+            'sigma_p' : 1e-4,
+            'sigma_fp' : 1e-1,
+            'sigma_fl_ofs' : 1e-1,
+            'q' : np.zeros((3,3)),
 
-        self.od_init = 0.25 # initial belief optical density
-        self.e_rel_init = 0.5 # %, initial relative belief of e. coli abundance
-        self.fl_init = 0.2 # initial belief of fluorescence
-
-        self.sigma_e_init = 0.01
-        self.sigma_p_init = 0.01
-        self.sigma_fp_init = 0.07
+            # Measurement noise standard deviation
+            'sigma_od' : 5e-1,
+            'sigma_fl' : 1e-1,
+            'r' : np.zeros((2,2))
+        }
 
 
 class CbDataParam:
@@ -111,6 +96,15 @@ class CbDataParam:
                             np.array([946, 1032, 1145, 1258, 1366, 1483, 2301, 2425, 2542])]
                 sampcycle = [sampcycle[i][0:7]-1 for i in range(len(file_ind))] # adapts indeces to python
                 titles = ['C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3']
+            case '064-2-test':
+                path = '../../Ting/Experiments/064-2'
+                # Indeces of files of interest
+                file_ind = [3,5]
+                # Sampcycle indices as in Matlab
+                sampcycle = [np.array([946, 1032, 1145, 1259, 1368, 1485, 2303, 2426, 2543, 2668]),
+                            np.array([946, 1032, 1145, 1258, 1367, 1483, 2301, 2424, 2540, 2665])]
+                sampcycle = [sampcycle[i][0:7]-1 for i in range(len(file_ind))] # adapts indeces to python
+                titles = ['C8M0','C8M2']
             case '062-4':
                 path = '../../Ting/Experiments/062-4'
                 # Indeces of files of interest
@@ -142,6 +136,12 @@ def getFcData(dataName):
                         FC_data[9::8].to_numpy(),
                         FC_data[10::8].to_numpy(),
                         FC_data[11::8].to_numpy()]
+        case '064-2-test':
+            FC_file = pd.read_excel('../../Ting/Experiments/064-2/231027 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_data = FC_file['% Parent.1'] + FC_file['% Parent.2']
+            cb_fc_ec = [FC_data[4::8].to_numpy(),
+                        FC_data[6::8].to_numpy()]
+            cb_fc_ec = [cb_fc_ec[i][0:7] for i in range(len(cb_fc_ec))]
         case _:
             raise Exception('Data information of {} not given.'.format(dataName))
     return cb_fc_ec

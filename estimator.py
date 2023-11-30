@@ -1,8 +1,4 @@
 import numpy as np
-from typing import Tuple
-
-from params import EstParam, ModelParam
-from model import Model
 
 class EKF:
     """
@@ -13,8 +9,7 @@ class EKF:
     estParam : EstConst
         Estimation constants
     """
-
-    def __init__(self, n_reactors: int, dithered: bool): # TODO: add od setpoint, dilution threshold and dilution amount as arguments
+    def __init__(self, model, r_ind, x0, p0: np.ndarray, update: bool = True):
         """
         Initialize the estimator. Sets the mean and covariance of the initial
         estimate.
@@ -24,26 +19,16 @@ class EKF:
         estParam : EstConst TODO: update
             Estimation constants
         """
-        self.n_reactors = n_reactors
-        self.dithered = dithered
-        self.estParam = EstParam()
-        self.modelParam = ModelParam()
-        self.model = Model(self.dithered, self.estParam.Ts)
-        self.time_prev = np.zeros(self.n_reactors)
-        self.temp_prev = np.zeros(self.n_reactors)
+        self.model = model
+        self.time_prev = 0
+        self.temp_prev = 0
 
-        e0 = self.estParam.e_rel_init * self.estParam.od_init
-        p0 = (1 - self.estParam.e_rel_init) * self.estParam.od_init
-        fp0 = (np.full((1,self.n_reactors), self.estParam.fl_init) - self.modelParam.min_fl)*self.estParam.od_init
-        est = np.full((self.n_reactors, 2),[e0, p0])
-        self.est = np.concatenate((est, fp0.T), axis=1)
+        self.est = x0
+        self.var = p0
+        self.r_ind = r_ind
+        self.update = update
 
-        self.var = np.full((self.n_reactors, self.estParam.num_states, self.estParam.num_states),np.diag([self.estParam.sigma_e_init**2, self.estParam.sigma_p_init**2, self.estParam.sigma_fp_init**2]))
-        
-    def reset(self):
-        self.model = Model(self.dithered, self.estParam.Ts)
-    
-    def estimate(self, r_ind: int, time: float, u: float, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def estimate(self, time: float, u: float, y: np.ndarray = np.zeros(0)):
         """
         Perform prediction step of the states of the system using the extended Kalman filter.
 
@@ -68,17 +53,16 @@ class EKF:
             is given by x = [e, p, fp].
         """
         # Prediction
-        if self.time_prev[r_ind] == 0: # First time step
-            self.time_prev[r_ind] = time
-            self.temp_prev[r_ind] = u
+        if self.time_prev == 0: # First time step
+            self.time_prev = time
+            self.temp_prev = u
         else: # Prediction step
-            dt = time - self.time_prev[r_ind]
-            self.est[r_ind], self.var[r_ind] = self.model.predict(self.est[r_ind], self.var[r_ind], self.temp_prev[r_ind], dt)
+            dt = time - self.time_prev
+            self.est, self.var = self.model.predict(self.r_ind, self.est, self.var, self.temp_prev, dt)
 
-            self.time_prev[r_ind] = time
-            self.temp_prev[r_ind] = u
+            self.time_prev = time
+            self.temp_prev = u
 
         # MeasurementUpdate
-        self.est[r_ind], self.var[r_ind] = self.model.update(r_ind, self.est[r_ind], self.var[r_ind], y)
-
-        return self.est[r_ind], self.var[r_ind]
+        if self.update:
+            self.est, self.var = self.model.update(self.r_ind, self.est, self.var, y)
