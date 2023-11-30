@@ -8,24 +8,22 @@ class CustModel:
     def __init__(self):
         self.parameters = Params().default
 
-        self.parameters['dil_th'] = self.parameters['od_setpoint'] + self.parameters['zig']
-        self.parameters['dil_amount'] = self.parameters['zig']*(1.5 + 1)
         self.parameters['lag_ind'] = int(self.parameters['lag']*3600/self.parameters['ts']) # Lag indeces
         self.parameters['r'] = np.diag([self.parameters['sigma_fl']**2, self.parameters['sigma_od']**2])
-        self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2, self.parameters['sigma_fl_ofs']**2])
+        self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
+        self.parameters['q_dil'] = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
 
         self.temps = np.array([np.full(self.parameters['lag_ind']+1,self.parameters['temp_h']),
                                np.full(self.parameters['lag_ind']+1,self.parameters['temp_l'])])
         self.ts = self.parameters['ts']
 
-        self.A_dil = np.eye(4)
-        self.L_dil = np.eye(4,3)
-        self.parameters['q_dil'] = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
+        self.A_dil = np.eye(3)
+        self.L_dil = np.eye(3)
 
-        self.A = np.eye(4)
-        self.L = np.eye(4)
+        self.A = np.eye(3)
+        self.L = np.eye(3)
 
-        self.H = np.zeros((2,4))
+        self.H = np.zeros((2,3))
         self.M = np.eye(2)
 
     def initialize(self, j, n_reactors):
@@ -55,8 +53,7 @@ class CustModel:
         x0 = {  # Initial state
             'e': self.parameters['od_init']*self.parameters['e_rel_init'],
             'p': self.parameters['od_init']*(1-self.parameters['e_rel_init']),
-            'fp': (self.parameters['fl_init']-self.parameters['fl_ofs'][j])*(self.parameters['od_init']+self.parameters['od_ofs']),
-            'fl_ofs': self.parameters['fl_ofs_init'][j],
+            'fp': (self.parameters['fl_init']-self.parameters['fl_ofs'][j])*(self.parameters['od_init']+self.parameters['od_ofs'])
         }
 
         return x0
@@ -72,7 +69,7 @@ class CustModel:
             self.A_dil = np.array([[x_prev[1]/den-1, -x_prev[0]/den, 0],
                                     [-x_prev[1]/den, x_prev[0]/den-1, 0],
                                     [-x_prev[2]/den, -x_prev[2]/den, 1/(x_prev[0]+x_prev[1]) - 1]])
-            p_dil = self.A_dil @ p_prev @ self.A_dil.T + self.L_dil @ self.Q_dil @ self.L_dil.T
+            p_dil = self.A_dil @ p_prev @ self.A_dil.T + self.L_dil @ self.parameters['q_dil'] @ self.L_dil.T
         return x_dil, p_dil
 
 
