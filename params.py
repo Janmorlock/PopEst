@@ -12,14 +12,6 @@ class Params:
             'ts' : 1, # seconds
             'dt' : 1, # seconds
 
-            'od_init' : 0.25, # initial belief optical density
-            'e_rel_init' : 0.5, # %, initial relative belief of e. coli abundance
-            'fl_init' : 0.2, # initial belief of fluorescence
-
-            'sigma_e_init' : 0.01,
-            'sigma_p_init' : 0.01,
-            'sigma_fp_init' : 0.07,
-
             'avg_temp' : True,
             'lag' : 3, # hours
             'lag_ind' : 0, # Lag indeces
@@ -31,8 +23,8 @@ class Params:
 
             ### Growth rate parameters
             # Linear line fitting to 062_5 data (without 36°C)
-            'beta_e' : 0.08388, # -0.45
-            'alpha_e' : -1.934, # 6.334
+            'beta_e' : 0.08388,
+            'alpha_e' : -1.934,
 
             # Cubic line fitting to 062_5 data
             'del_p' : -0.001184,
@@ -45,6 +37,14 @@ class Params:
 
 
             ### Parameters for the Kalman filter
+            'od_init' : 0.25, # initial belief optical density
+            'e_rel_init' : 0.5, # %, initial relative belief of e. coli abundance
+            'fp_init' : 0.056, # initial belief of fluorescence
+
+            'sigma_e_init' : 0.01,
+            'sigma_p_init' : 0.01,
+            'sigma_fp_init' : 0.05,
+
             # Process noise standard deviation
             'sigma_e_dil' : 5e-3,
             'sigma_p_dil' : 5e-3,

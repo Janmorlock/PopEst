@@ -6,51 +6,67 @@ class EKF:
 
     Attributes
     ----------
-    estParam : EstConst
-        Estimation constants
+    model : CustModel or CustProgModel
+        Model that is used to predict and update the state estimate.
+    est : np.ndarray, dim: (num_states,)
+        The mean of the previous state estimate. The order of states is
+        given by x = [e, p, fp, fl_ofs].
+    var : np.ndarray, dim: (num_states, num_states)
+        The covariance of the previous state estimate. The order of states
+        is given by x = [e, p, fp, fl_ofs].
+    r_ind : int
+        The index of the reactor.
+    update : bool
+        Whether to perform the measurement update step.
+    time_prev : float
+        The time of the previous measurement.
+    temp_prev : float
+        The temperature of the previous measurement.
     """
-    def __init__(self, model, r_ind, x0, p0: np.ndarray, update: bool = True):
+    def __init__(self, model, r_ind: int, x0, p0: np.ndarray, update: bool = True):
         """
         Initialize the estimator. Sets the mean and covariance of the initial
         estimate.
 
         Parameters
         ----------
-        estParam : EstConst TODO: update
-            Estimation constants
+        model : CustModel or CustProgModel
+            Model that is used to predict and update the state estimate.
+        r_ind : int
+            The index of the reactor.
+        x0 : dict[str, float], dim: (num_states,)
+            The mean of the initial state estimate. The order of states is given by x = [e, p, fp, fl_ofs].
+        p0 : np.ndarray, dim: (num_states, num_states)
+            The covariance of the initial state estimate. The order of states is given by x = [e, p, fp, fl_ofs].
+        update : bool, optional
+            Whether to perform the measurement update step. Default is True.
         """
         self.model = model
-        self.time_prev = 0
-        self.temp_prev = 0
+        self.time_prev = 0.0
+        self.temp_prev = 0.0
 
-        self.est = x0
-        self.var = p0
+        self.est = x0.copy()
+        self.var = p0.copy()
         self.r_ind = r_ind
         self.update = update
 
     def estimate(self, time: float, u: float, y: np.ndarray = np.zeros(0)):
         """
-        Perform prediction step of the states of the system using the extended Kalman filter.
+        Update system state and variance estimate by performing prediction and measurement update step with the Extended Kalman Filter.
 
         Parameters
         ----------
-        xm : np.ndarray, dim: (num_states,) TODO: update
-            The mean of the previous state estimate. The order of states is
-            given by x = [e, p, fp].
-        Pm : np.ndarray, dim: (num_states, num_states)
-            The covariance of the previous state estimate. The order of states
-            is given by x = [e, p, fp].
-        u : np.ndarray, dim: (num_inputs,)
-            The input to the system. The order of inputs is given by u = temp_prev.
+        time : float
+            The time in s at which the measurement is obtained.
+        u : float
+            The input u = temp_prev to the system.
+        y : np.ndarray, dim: (num_outputs,), optional
+            The measurement of the system. The order of outputs is given by y = [fl, od].
+            Will be ignored when update set to False.
 
         Returns
         -------
-        xp : np.ndarray, dim: (num_states,)
-            The mean of the current state estimate. The order of states is
-            given by x = [e, p, fp].
-        Pp : np.ndarray, dim: (num_states, num_states)
-            The covariance of the current state estimate. The order of states
-            is given by x = [e, p, fp].
+        None
         """
         # Prediction
         if self.time_prev == 0: # First time step

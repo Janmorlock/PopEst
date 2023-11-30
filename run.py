@@ -68,7 +68,8 @@ if __name__ == "__main__":
     filter = 'ekf'
     cbParam = CbDataParam(data_name)
     cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
-    # Initialize the estimator
+
+    # Initialize the model
     model_pred = CustModel()
     if (filter == 'ucf'):
         model = CustProgModel()
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     critTemp = getCritTemp()[0]
     assert(26 < critTemp and critTemp < 37)
 
-    # reactor, time, state
+    # dim = reactor, time, state
     estimates_pred = [[] for j in range(cbParam.n_reactors)]
     estimates = [[] for j in range(cbParam.n_reactors)]
     variances = [[] for j in range(cbParam.n_reactors)]
@@ -165,7 +166,7 @@ if __name__ == "__main__":
         ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'--m',lw = 0.8, label = '$fl_{pred}*100$')
         ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'m',lw = 0.8, label = '$fl_{est}*100$')
         ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.k',markersize = 0.8, label = '$fl_{meas}*100$')
-        ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.4, label = '$od_{est}*100$')
+        ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.5, alpha = 0.5, label = '$od_{est}*100$')
         # ax[r][c].fill_between(cbData.time_h[j], p_puti_percent-p_puti_per_sigma, p_puti_percent+p_puti_per_sigma, color='g',alpha=0.2)
 
         ax[r][c].legend(loc="upper left")

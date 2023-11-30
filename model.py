@@ -53,14 +53,14 @@ class CustModel:
         x0 = {  # Initial state
             'e': self.parameters['od_init']*self.parameters['e_rel_init'],
             'p': self.parameters['od_init']*(1-self.parameters['e_rel_init']),
-            'fp': (self.parameters['fl_init']-self.parameters['fl_ofs'][j])*(self.parameters['od_init']+self.parameters['od_ofs'])
+            'fp': self.parameters['fp_init']
         }
 
         return x0
 
     def dilute(self, x_prev: np.ndarray, p_prev: np.ndarray):
-        x_dil = x_prev
-        p_dil = p_prev
+        x_dil = x_prev.copy()
+        p_dil = p_prev.copy()
         # Dilution, checked at same rate as real system TODO: add dithered dilution
         if x_prev[0] + x_prev[1] > self.parameters['od_setpoint']:
             x_dil = (2*self.parameters['od_setpoint']/(x_prev[0] + x_prev[1]) - 1)*x_prev
