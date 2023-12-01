@@ -10,11 +10,11 @@ from progpy.state_estimators import UnscentedKalmanFilter
 from progpy.uncertain_data import MultivariateNormalDist
 
 from estimator import EKF
-from params import CbDataParam
+from paramsData import CbDataParam
 from newModel import CustProgModel
 from model import CustModel
 
-def f(xy, model = CustModel()):
+def f(xy, model = CustModel(1)):
     x, y = xy
     gr = model.getGrowthRates(np.full(3,x))
     z = np.array([y - gr[0],
@@ -70,11 +70,11 @@ if __name__ == "__main__":
     cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
 
     # Initialize the model
-    model_pred = CustModel()
+    model_pred = CustModel(cbParam.n_reactors)
     if (filter == 'ucf'):
         model = CustProgModel()
     elif (filter == 'ekf'):
-        model = CustModel()
+        model = CustModel(cbParam.n_reactors)
     else:
         raise Exception("Invalid filter type")
 
@@ -86,18 +86,17 @@ if __name__ == "__main__":
     estimates = [[] for j in range(cbParam.n_reactors)]
     variances = [[] for j in range(cbParam.n_reactors)]
     for j in range(cbParam.n_reactors):
-        x0_pred = model_pred.initialize(j,cbParam.n_reactors)
-        x0 = model.initialize(j,cbParam.n_reactors)
-        # Turn into a distribution - this represents uncertainty in the initial state
-        # Construct covariance matrix (making sure each value is positive)
-        cov = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
         # Construct State estimator
-        est_pred = EKF(model_pred, j, x0_pred, cov, update = False)
+        est_pred = EKF(model_pred, j, update = False)
         if (filter == 'ucf'):
+            x0 = model.initialize()
+            # Turn into a distribution - this represents uncertainty in the initial state
+            # Construct covariance matrix (making sure each value is positive)
+            cov = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
             est = UnscentedKalmanFilter(model, x0, dt = 1, Q = model.parameters['q'], R = model.parameters['r'])
             x0 = MultivariateNormalDist(x0.keys(), x0.values(), cov)
         elif (filter == 'ekf'):
-            est = EKF(model, j, x0, cov)
+            est = EKF(model, j)
         for k in range(len(cbData.time[j])):
             # Run the filter
             u_pred = cbData.temp[j][k]

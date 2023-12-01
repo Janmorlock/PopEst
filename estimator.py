@@ -23,7 +23,7 @@ class EKF:
     temp_prev : float
         The temperature of the previous measurement.
     """
-    def __init__(self, model, r_ind: int, x0, p0: np.ndarray, update: bool = True):
+    def __init__(self, model, r_ind: int, update: bool = True):
         """
         Initialize the estimator. Sets the mean and covariance of the initial
         estimate.
@@ -34,21 +34,21 @@ class EKF:
             Model that is used to predict and update the state estimate.
         r_ind : int
             The index of the reactor.
-        x0 : dict[str, float], dim: (num_states,)
-            The mean of the initial state estimate. The order of states is given by x = [e, p, fp, fl_ofs].
-        p0 : np.ndarray, dim: (num_states, num_states)
-            The covariance of the initial state estimate. The order of states is given by x = [e, p, fp, fl_ofs].
         update : bool, optional
             Whether to perform the measurement update step. Default is True.
         """
         self.model = model
+        self.r_ind = r_ind
+        self.update = update
         self.time_prev = 0.0
         self.temp_prev = 0.0
 
-        self.est = x0.copy()
-        self.var = p0.copy()
-        self.r_ind = r_ind
-        self.update = update
+        self.est = {  # Initial state
+            'e': model.parameters['od_init']*model.parameters['e_rel_init'],
+            'p': model.parameters['od_init']*(1-model.parameters['e_rel_init']),
+            'fp': model.parameters['fp_init']
+        }
+        self.var = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
 
     def estimate(self, time: float, u: float, y: np.ndarray = np.zeros(0)):
         """

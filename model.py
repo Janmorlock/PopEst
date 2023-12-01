@@ -5,7 +5,7 @@ from params import Params
 
 # initialize
 class CustModel:
-    def __init__(self):
+    def __init__(self, n_reactors: int):
         self.parameters = Params().default
 
         self.parameters['lag_ind'] = int(self.parameters['lag']*3600/self.parameters['ts']) # Lag indeces
@@ -13,8 +13,8 @@ class CustModel:
         self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
         self.parameters['q_dil'] = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
 
-        self.temps = np.array([np.full(self.parameters['lag_ind']+1,self.parameters['temp_h']),
-                               np.full(self.parameters['lag_ind']+1,self.parameters['temp_l'])])
+        temps = np.full((self.parameters['lag_ind']+1,2),[self.parameters['temp_h'],self.parameters['temp_l']],dtype='float').T
+        self.temps = np.full((n_reactors,temps.shape[0],temps.shape[1]),temps)
         self.ts = self.parameters['ts']
 
         self.A_dil = np.eye(3)
@@ -26,37 +26,6 @@ class CustModel:
         self.H = np.zeros((2,3))
         self.M = np.eye(2)
 
-    def initialize(self, j, n_reactors):
-        """
-        Calculate initial state given inputs and outputs
-    
-        Parameters
-        ----------
-        u : InputContainer
-            Inputs, with keys defined by model.inputs.
-            e.g., u = {'i':3.2} given inputs = ['i']
-        z : OutputContainer
-            Outputs, with keys defined by model.outputs.
-            e.g., z = {'t':12.4, 'v':3.3} given inputs = ['t', 'v']
-    
-        Returns
-        -------
-        x : StateContainer
-            First state, with keys defined by model.states
-            e.g., x = {'abc': 332.1, 'def': 221.003} given states = ['abc', 'def']
-        """
-    
-        # REPLACE BELOW WITH LOGIC TO CALCULATE INITIAL STATE
-        # NOTE: KEYS FOR x0 MATCH 'states' LIST ABOVE
-        temps = np.full((self.parameters['lag_ind']+1,2),[self.parameters['temp_h'],self.parameters['temp_l']],dtype='float').T
-        self.temps = np.full((n_reactors,temps.shape[0],temps.shape[1]),temps)
-        x0 = {  # Initial state
-            'e': self.parameters['od_init']*self.parameters['e_rel_init'],
-            'p': self.parameters['od_init']*(1-self.parameters['e_rel_init']),
-            'fp': self.parameters['fp_init']
-        }
-
-        return x0
 
     def dilute(self, x_prev: np.ndarray, p_prev: np.ndarray):
         x_dil = x_prev.copy()
