@@ -32,7 +32,7 @@ class CbDataParam:
                             np.array([946, 1032, 1145, 1258, 1366, 1483, 2301, 2425, 2542, 2667]),
                             np.array([946, 1032, 1145, 1258, 1366, 1483, 2301, 2425, 2542, 2667])-942,
                             np.array([946, 1032, 1145, 1258, 1366, 1483, 2301, 2425, 2542])]
-                sampcycle = [sampcycle[i][0:7]-1 for i in range(len(file_ind))] # adapts indeces to python
+                sampcycle = [sampcycle[i] for i in range(len(file_ind))] # adapts indeces to python
                 titles = ['C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3']
             case '064-2-test':
                 path = '../../Ting/Experiments/064-2'
@@ -41,7 +41,7 @@ class CbDataParam:
                 # Sampcycle indices as in Matlab
                 sampcycle = [np.array([946, 1032, 1145, 1259, 1368, 1485, 2303, 2426, 2543, 2668]),
                             np.array([946, 1032, 1145, 1258, 1367, 1483, 2301, 2424, 2540, 2665])]
-                sampcycle = [sampcycle[i][0:7]-1 for i in range(len(file_ind))] # adapts indeces to python
+                sampcycle -= 1 # adapts indeces to python
                 titles = ['C8M0','C8M2']
             case '062-4':
                 path = '../../Ting/Experiments/062-4'
@@ -51,6 +51,14 @@ class CbDataParam:
                 # Sampcycle indices as in Matlab
                 sampcycle = np.array([[0,1400] for i in range(n_reactors)])
                 titles = ['26','27','29','30','31','33','35','37']
+            case '051-1':
+                path = '../../Ting/Experiments/051-1'
+                # Indeces of files of interest
+                file_ind = [2,3,4,5,0,1]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1000] for i in range(n_reactors)])
+                titles = ['C7M0','C7M1','C7M2','C7M3','C9M2','C9M3']
             case _:
                 raise Exception('Data information of {} not given.'.format(dataName))
         
@@ -64,22 +72,28 @@ def getFcData(dataName):
             cb_fc_ec = np.array([FC_data[4::4].to_numpy(),
                                 FC_data[5::4].to_numpy()])
         case '064-2':
-            FC_file = pd.read_excel('../../Ting/Experiments/064-2/231027 Facility Analysis Manual Count.xlsx',header=[1])
-            FC_data = FC_file['% Parent.1'] + FC_file['% Parent.2']
-            cb_fc_ec = [FC_data[4::8].to_numpy(),
-                        FC_data[5::8].to_numpy(),
-                        FC_data[6::8].to_numpy(),
-                        FC_data[7::8].to_numpy(),
-                        FC_data[8::8].to_numpy(),
-                        FC_data[9::8].to_numpy(),
-                        FC_data[10::8].to_numpy(),
-                        FC_data[11::8].to_numpy()]
+            FC_file1 = pd.read_excel('../../Ting/Experiments/064-2/231027 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_file2 = pd.read_excel('../../Ting/Experiments/064-2/231103 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_data1 = FC_file1['% Parent.1'] + FC_file1['% Parent.2']
+            FC_data2 = FC_file2['% Parent.1'] + FC_file2['% Parent.2']
+            FC_data = np.append(FC_data1.to_numpy(),FC_data2.to_numpy())
+            cb_fc_ec = [FC_data[4::8],
+                        FC_data[5::8],
+                        FC_data[6::8],
+                        FC_data[7::8],
+                        FC_data[8::8],
+                        FC_data[9::8],
+                        FC_data[10::8],
+                        FC_data[11:-1:8]]
         case '064-2-test':
-            FC_file = pd.read_excel('../../Ting/Experiments/064-2/231027 Facility Analysis Manual Count.xlsx',header=[1])
-            FC_data = FC_file['% Parent.1'] + FC_file['% Parent.2']
-            cb_fc_ec = [FC_data[4::8].to_numpy(),
-                        FC_data[6::8].to_numpy()]
-            cb_fc_ec = [cb_fc_ec[i][0:7] for i in range(len(cb_fc_ec))]
+            FC_file1 = pd.read_excel('../../Ting/Experiments/064-2/231027 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_file2 = pd.read_excel('../../Ting/Experiments/064-2/231103 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_data1 = FC_file1['% Parent.1'] + FC_file1['% Parent.2']
+            FC_data2 = FC_file2['% Parent.1'] + FC_file2['% Parent.2']
+            FC_data = np.append(FC_data1.to_numpy(),FC_data2.to_numpy())
+            cb_fc_ec = [FC_data[4::8],
+                        FC_data[6::8]]
         case _:
-            raise Exception('Data information of {} not given.'.format(dataName))
+            cb_fc_ec = 0
+            print('cb_fc_ec information of {} not given.'.format(dataName))
     return cb_fc_ec
