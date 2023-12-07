@@ -65,7 +65,7 @@ def getGrowthRate(temp, parameters):
     return gr
 
 def getGrowthRateFl(temp, parameters):
-    gr = np.array([parameters.Gam_fp*temp[2]**2 + parameters.Beta_fp*temp[2] + parameters.Alpha_fp])
+    gr = np.array([parameters.Gam_fp*temp**2 + parameters.Beta_fp*temp + parameters.Alpha_fp])
     gr[gr < 0] = 0
     return gr
             
