@@ -49,7 +49,7 @@ class CbData:
             cb_dfs.append(df)
 
         self.time, self.time_h, self.od, self.temp, self.fl, self.p1 = [], [], [], [], [], []
-        self.hr, self.b1, self.temp_sp, self.temp_ext, self.temp_int = [], [], [], [], []
+        self.hr, self.b1, self.temp_sp, self.temp_ext, self.temp_int, self.fl2 = [], [], [], [], [], []
         for j in range(n_reactors):
             time = cb_dfs[j]["exp_time"][scope[j][0]:scope[j][-1]+1].to_numpy()
             self.time.append(time-time[0])
@@ -65,6 +65,7 @@ class CbData:
             self.temp_sp.append(cb_dfs[j]["thermostat_setpoint"][scope[j][0]:scope[j][-1]+1].to_numpy())
             self.temp_ext.append(cb_dfs[j]["external_air_temp"][scope[j][0]:scope[j][-1]+1].to_numpy())
             self.temp_int.append(cb_dfs[j]["internal_air_temp"][scope[j][0]:scope[j][-1]+1].to_numpy())
+            self.fl2.append(cb_dfs[j]["FP1_emit2"][scope[j][0]:scope[j][-1]+1].to_numpy())
         # self.time = [self.time[j]-self.time[j][0] for j in range(n_reactors)]
 
 if __name__ == "__main__":
