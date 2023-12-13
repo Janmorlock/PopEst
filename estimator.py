@@ -69,15 +69,12 @@ class EKF:
         None
         """
         # Prediction
-        if self.time_prev == 0: # First time step
-            self.time_prev = time
-            self.temp_prev = u
-        else: # Prediction step
+        if self.time_prev != 0: # Skip on first time step
             dt = time - self.time_prev
             self.est, self.var = self.model.predict(self.r_ind, self.est, self.var, self.temp_prev, dt)
 
-            self.time_prev = time
-            self.temp_prev = u
+        self.time_prev = time
+        self.temp_prev = u
 
         # MeasurementUpdate
         if self.update:

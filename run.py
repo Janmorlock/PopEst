@@ -49,7 +49,7 @@ class CbData:
             cb_dfs.append(df)
 
         self.time, self.time_h, self.od, self.temp, self.fl, self.p1 = [], [], [], [], [], []
-        self.hr, self.b1, self.temp_sp, self.temp_ext, self.temp_int, self.fl2 = [], [], [], [], [], []
+        self.hr, self.b1, self.temp_sp, self.temp_ext, self.temp_int, self.fl2,  self.p2 = [], [], [], [], [], [], []
         for j in range(n_reactors):
             time = cb_dfs[j]["exp_time"][scope[j][0]:scope[j][-1]+1].to_numpy()
             self.time.append(time-time[0])
@@ -66,7 +66,7 @@ class CbData:
             self.temp_ext.append(cb_dfs[j]["external_air_temp"][scope[j][0]:scope[j][-1]+1].to_numpy())
             self.temp_int.append(cb_dfs[j]["internal_air_temp"][scope[j][0]:scope[j][-1]+1].to_numpy())
             self.fl2.append(cb_dfs[j]["FP1_emit2"][scope[j][0]:scope[j][-1]+1].to_numpy())
-        # self.time = [self.time[j]-self.time[j][0] for j in range(n_reactors)]
+            self.p2.append(cb_dfs[j]["pump_2_rate"][scope[j][0]:scope[j][-1]+1].to_numpy())
 
 if __name__ == "__main__":
 
@@ -142,9 +142,9 @@ if __name__ == "__main__":
         r = j//2
         c = j%2
         # j = 1
-        e_coli_pred = np.array([estimates_pred[j][k]['e'] for k in range(len(estimates[j]))])
-        p_puti_pred = np.array([estimates_pred[j][k]['p'] for k in range(len(estimates[j]))])
-        fp_pred = np.array([estimates_pred[j][k]['fp'] for k in range(len(estimates[j]))])
+        e_coli_pred = np.array([estimates_pred[j][k]['e'] for k in range(len(estimates_pred[j]))])
+        p_puti_pred = np.array([estimates_pred[j][k]['p'] for k in range(len(estimates_pred[j]))])
+        fp_pred = np.array([estimates_pred[j][k]['fp'] for k in range(len(estimates_pred[j]))])
         od_pred = e_coli_pred + p_puti_pred
         p_puti_pred_percent = p_puti_pred/od_pred*100
 

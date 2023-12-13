@@ -100,16 +100,16 @@ if __name__ == "__main__":
         axr.set_zorder(1)
         ax[r][c].patch.set_visible(False)
 
-        axr.plot(cbData.time_h[j],cbData.temp[j],'r',lw=0.7)
+        axr.plot(cbData.time_h[j],cbData.temp[j],'r',lw=0.5)
+        # ax[r][c].plot(cbData.time_h[j],cbData.od[j],'k',lw = 0.5, label = 'p. putida od')
         ax[r][c].plot(cbData.time_h[j],cbData.fl[j],'.g',markersize = 0.8, label = '$fl_{meas}$')
         if param.mcmc:
             ax[r][c].plot(cbData.time_h[j],sim_fl_train[j][0],'k',lw = 0.5, label = '$fl_{sim, train}$', alpha = 0.1)
             for s in range(1,min(param.n_samples,100)):
                 ax[r][c].plot(cbData.time_h[j],sim_fl_train[j][s],'k',lw = 0.5, alpha = 0.1)
             ax[r][c].plot(cbData.time_h[j],sim_fl_train[j][s_min[j]],'m', lw = 0.7, label = '$fl_{sim, opt}$')
-        ax[r][c].plot(cbData.time_h[j],sim_fl_test[j][0],'b',lw = 0.7, label = '$fl_{sim, model}$')
+        ax[r][c].plot(cbData.time_h[j],sim_fl_test[j][0],'b',lw = 1, label = '$fl_{sim, model}$')
 
-        # ax[r][c].plot(cbData.time_h[j],cbData.od[j],'g',lw = 0.5, label = 'p. putida od')
         # ax[r][c].vlines(cbData.time_h[j][cb_dil[j]==1],-2,2,'g',lw = 0.5, alpha=0.5, label = 'p. putida dil')
         # ax[j].plot(cbData.time_h[j],cbData.od[j]*100,'--m',lw = 0.5, label = 'od')
 
@@ -123,7 +123,7 @@ if __name__ == "__main__":
             ax[r][c].set_xlabel("Time [h]")
         axr.tick_params(axis='y', color='r', labelcolor='r')
         ax[r][c].set_xlim([sim_hrs[j][0]-0.5,sim_hrs[j][-1]+0.5])
-        ax[r][c].set_ylim([-0.05,0.55])
+        ax[r][c].set_ylim([0,0.5])
         axr.set_ylim([25,38])
         ax[r][c].set_title(cbParam.titles[j])
     # TODO: Set titles

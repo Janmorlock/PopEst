@@ -18,7 +18,7 @@ class ModParam:
         self.Lag = 3 # hours
         # TODO: Adapt min/max fluorescense values of the respective reactors
         # self.min_fl = [0.0384, 0.141, 0.112, 0.119, 0.104, 0.13, 0.093, 0.108]
-        self.min_fl = np.array([0.06670286988458429, 0.09954091472779605, 0.01339878054716663, 0.09732706551691282, 0.08975873832801415, 0.1128096218942311, 0.061012361789911165, 0.04765733175961176]).T # [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]
+        self.min_fl = np.array([0.06668681763440748, 0.10129968019248045, 0.014508302984426407, 0.09772901252859235, 0.08988247242606058, 0.11187820931518658, 0.059842450984781456, 0.050616139008507456]).T # [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061]
         self.max_fl = []
         self.minv = 0.059
         self.maxv = 0.290
@@ -37,11 +37,10 @@ class ModParam:
         self.Beta_p = np.array([-2.413])
         self.Alpha_p = np.array([20.74])
 
-        # Pw linear model for fluorescent protein dynamcs
-        self.Del_fp = np.array([0.0])
-        self.Gam_fp = np.array([-0.010030269158100553])
-        self.Beta_fp = np.array([0.5909218418486065])
-        self.Alpha_fp = np.array([-8.374536265928038])
+        # Quadratic line fitting to 062_4 data
+        self.Gam_fp = np.array([-0.009919789860461197])
+        self.Beta_fp = np.array([0.5842676792191441])
+        self.Alpha_fp = np.array([-8.275973495562294])
         self.gr_fp = np.zeros(1,dtype='float')
                           
 
