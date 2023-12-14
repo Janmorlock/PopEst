@@ -9,7 +9,7 @@ class CustModel:
         self.parameters = Params().default
 
         self.parameters['lag_ind'] = int(self.parameters['lag']*3600/self.parameters['ts']) # Lag indeces
-        self.parameters['r'] = np.diag([self.parameters['sigma_fl']**2, self.parameters['sigma_od']**2])
+        self.parameters['r'] = np.diag([self.parameters['sigma_od']**2])
         self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
         self.parameters['q_dil'] = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
 
@@ -23,8 +23,8 @@ class CustModel:
         self.A = np.eye(3)
         self.L = np.eye(3)
 
-        self.H = np.zeros((2,3))
-        self.M = np.eye(2)
+        self.H = np.zeros((1,3))
+        self.M = np.eye(1)
 
 
     def dilute(self, x_prev: np.ndarray, p_prev: np.ndarray):
@@ -32,7 +32,11 @@ class CustModel:
         p_dil = p_prev.copy()
         # Dilution, checked at same rate as real system TODO: add dithered dilution
         if x_prev[0] + x_prev[1] > self.parameters['od_setpoint']:
-            x_dil = (2*self.parameters['od_setpoint']/(x_prev[0] + x_prev[1]) - 1)*x_prev
+            if x_prev[0] + x_prev[1] < 1.1*self.parameters['od_setpoint']:
+                x_dil *= (2*self.parameters['od_setpoint']/(x_prev[0] + x_prev[1]) - 1)
+            else: # Prevent too extensive bounce back from high od values
+                print('diluting differently')
+                x_dil *= self.parameters['od_setpoint']/(x_prev[0] + x_prev[1])
             # Jacobian of dilution
             den = (x_prev[0] + x_prev[1])**2
             self.A_dil = np.array([[x_prev[1]/den-1, -x_prev[0]/den, 0],
@@ -70,14 +74,16 @@ class CustModel:
 
         return dict(zip(x_prev_dic, x_pred)), p_pred
     
-    def update(self, r_ind, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray) -> Tuple[dict, np.ndarray]:
+    def update(self, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray) -> Tuple[dict, np.ndarray]:
         x_pred = np.fromiter(x_pred_dic.values(),dtype=float)
         od = x_pred[0] + x_pred[1]
-        self.H = np.array([[-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])],
-                           [1, 1, 0]])
+        # self.H = np.array([[-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])],
+        #                    [1, 1, 0]])
+        self.H = np.array([[1, 1, 0]])
         # K = np.linalg.solve(self.H @ p_pred.T @ self.H.T + self.M @ self.parameters['r'].T @ self.M.T, self.H @ p_pred.T).T
         K = p_pred @ self.H.T @ np.linalg.inv(self.H @ p_pred @ self.H.T + self.M @ self.parameters['r'] @ self.M.T)
-        y_est = np.array([x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind], od])
+        # y_est = np.array([x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind], od])
+        y_est = np.array([od])
         xm = x_pred + K @ (y - y_est)
         xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
         Pm = (np.eye(3) - K @ self.H) @ p_pred

@@ -71,7 +71,7 @@ class CbData:
 if __name__ == "__main__":
 
     # SPECIFY DATA
-    data_name = '064-2'
+    data_name = '064-2-test'
     filter = 'ekf'
     cbParam = CbDataParam(data_name)
     cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
@@ -117,8 +117,8 @@ if __name__ == "__main__":
                 variances[j].append(est.x.cov)
             elif (filter == 'ekf'):
                 u = cbData.temp[j][k]
-                z = np.array([cbData.fl[j][k], cbData.od[j][k]])
-                est.estimate(cbData.time[j][k], u, z)
+                y = np.array([cbData.od[j][k]])
+                est.estimate(cbData.time[j][k], u, y)
                 estimates[j].append(est.est)
                 variances[j].append(est.var)
 
@@ -205,4 +205,4 @@ if __name__ == "__main__":
     results_dir = "Images/{}".format(data_name)
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir+"/{}_{}r_{}h{}lag.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''))
+    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_od.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''))

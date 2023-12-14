@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 class EKF:
     """
@@ -69,7 +70,7 @@ class EKF:
         None
         """
         # Prediction
-        if self.time_prev != 0: # Skip on first time step
+        if self.temp_prev != 0: # Skip on first time step
             dt = time - self.time_prev
             self.est, self.var = self.model.predict(self.r_ind, self.est, self.var, self.temp_prev, dt)
 
@@ -78,4 +79,7 @@ class EKF:
 
         # MeasurementUpdate
         if self.update:
-            self.est, self.var = self.model.update(self.r_ind, self.est, self.var, y)
+            if abs(self.est['e'] + self.est['p'] - y[0]) < 0.1:
+                self.est, self.var = self.model.update(self.est, self.var, y)
+            else:
+                print('od update discared [{}] [{}:{}]'.format(self.r_ind, math.floor(time/3600), math.floor((time/3600-math.floor(time/3600))*60)))
