@@ -13,7 +13,7 @@ class ModParam:
 
         self.dil_th = 0.54
         self.dil_amount = 0.11
-        self.Dil_sp = 0.5
+        self.dil_sp = 0.5
         self.Avg_temp = True
         self.Lag = 3 # hours
         # TODO: Adapt min/max fluorescense values of the respective reactors
@@ -25,7 +25,7 @@ class ModParam:
 
         self.od_ofs = np.array([0.2])
         self.n_samples = 10000
-        self.mcmc = True
+        self.mcmc = False
 
         # Linear line fitting to 062_5 data (without 36°C)
         self.Beta_e = np.array([0.08388]) # -0.45
