@@ -53,9 +53,9 @@ def dilute(x_curr, parameters):
     Take self.dil_am out of the reactor and update self.pop correspondingly.
     """
     od = np.array([x_curr[:,0] + x_curr[:,1], x_curr[:,0] + x_curr[:,1]]).T
-    dil = od[:,0] > parameters.Dil_sp
-    # dil = 1 if od > parameters.Dil_sp else 0
-    x_curr[dil,:] = (2*parameters.Dil_sp/od[dil] - 1)*x_curr[dil,:]
+    dil = od[:,0] > parameters.dil_sp
+    # dil = 1 if od > parameters.dil_sp else 0
+    x_curr[dil,:] = (2*parameters.dil_sp/od[dil] - 1)*x_curr[dil,:]
     return x_curr
 
 def getGrowthRate(temp, parameters):
@@ -168,8 +168,8 @@ if __name__ == "__main__":
 
 
     if param.mcmc:
-    # Run multiple simulations with different growth rates
-    p_rel_train, fl_p_train = [], []
+        # Run multiple simulations with different growth rates
+        p_rel_train, fl_p_train = [], []
         rmse = np.zeros((1,param.n_samples))
         param.Alpha_e = np.random.normal(param.Alpha_e[0], 0.03*abs(param.Alpha_e[0]), param.n_samples)
         param.Beta_e = np.random.normal(param.Beta_e[0], 0.05*abs(param.Beta_e[0]), param.n_samples)
@@ -294,12 +294,9 @@ if __name__ == "__main__":
             axr[i].plot(sim_hrs[i],sim_tem_p[i],'r',lw=0.5)
             ax[r][c].plot(cbData.time_h[i],p_rel_prior[i][:,0], 'g', label = 'p. putida')
             ax[r][c].plot(cbData.time_h[i][cbParam.sampcycle[i]-cbParam.sampcycle[i][0]],100-cbParam.cb_fc_ec[i], 'gx', label = 'p. putida fc',lw=0.4)
-            ax[r][c].plot(cbData.time_h[i],od[i]*100,'-k',lw = 0.5, alpha = 0.5, label = '$od_{est}*100$')
-            ax[r][c].plot(cbData.time_h[i][gradients[i][:,0]!=0],gradients[i][gradients[i][:,0]!=0,0]*100,'.--m',lw = 0.5, alpha = 0.5, label = 'od gradient')
-            ax[r][c].plot(cbData.time_h[i][p_rel_grad[i][:,0]!=0],p_rel_grad[i][p_rel_grad[i][:,0]!=0,0],'.--g',lw = 0.5, alpha = 0.5, label = 'p. putida gradient')
             ax[r][c].legend(loc="upper left")
 
     # TODO: Set titles
     fig.suptitle(dataName)
     fig.tight_layout()
-    fig.savefig("Images/{}/{}r_{}h{}lag_est_new.png".format(dataName,n_reactors,param.Lag,'avg' if param.Avg_temp else ''))
+    fig.savefig("Images/{}/{}r_{}h{}lag_est.png".format(dataName,cbParam.n_reactors,param.Lag,'avg' if param.Avg_temp else ''))
