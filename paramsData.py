@@ -67,6 +67,14 @@ class CbDataParam:
                 # Sampcycle indices as in Matlab
                 sampcycle = np.array([[0,1800] for i in range(n_reactors)])
                 titles = ['C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3']
+            case '067-3':
+                path = '../../Ting/Experiments/067-3'
+                # Indeces of files of interest
+                file_ind = [0,1]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1800] for i in range(n_reactors)])
+                titles = ['C9M0','C9M1']
             case _:
                 raise Exception('Data information of {} not given.'.format(dataName))
         

@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import matplotlib
 import os
 
 from popParam import ModParam
@@ -11,7 +12,7 @@ from paramsData import CbDataParam
 
 if __name__ == "__main__":    
     # SPECIFY DATA
-    dataName = '062-4'
+    dataName = '067-3'
     cbParam = CbDataParam(dataName)
     tem = [26, 27, 29, 30, 31, 33, 35, 37]
     results_dir = "Images/{}".format(dataName)
@@ -89,9 +90,15 @@ if __name__ == "__main__":
     
     # ANALYSIS
     n_rows = math.ceil(cbParam.n_reactors/2)
+    n_culumns = 2 if cbParam.n_reactors > 1 else 1
+    matplotlib.style.use('default')
     fig, ax = plt.subplots(n_rows,2,sharey='row')
     fig.set_figheight(n_rows*7)
-    fig.set_figwidth(20)
+    fig.set_figwidth(n_culumns*10)
+    if n_culumns == 1:
+        ax = [ax]
+    if n_rows == 1:
+        ax = [ax]
     for j in range(cbParam.n_reactors):
         r = j//2
         c = j%2
