@@ -51,6 +51,14 @@ class CbDataParam:
                 # Sampcycle indices as in Matlab
                 sampcycle = np.array([[0,1400] for i in range(n_reactors)])
                 titles = ['26','27','29','30','31','33','35','37']
+            case '062-5':
+                path = '../../Ting/Experiments/062-5'
+                # Indeces of files of interest
+                file_ind = [4,5,6,7]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1400] for i in range(n_reactors)])
+                titles = ['34','35','36','37']
             case '051-1':
                 path = '../../Ting/Experiments/051-1'
                 # Indeces of files of interest

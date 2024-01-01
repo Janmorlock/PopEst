@@ -21,12 +21,14 @@ if __name__ == "__main__":
 
     param = ModParam()
     if param.mcmc:
-        param.gr_fp = np.random.uniform(0, 0.35, (param.n_samples,cbParam.n_reactors)).T
-        param.min_fl = np.random.uniform(0, [cbData.fl[r][0] for r in range(cbParam.n_reactors)], (param.n_samples,cbParam.n_reactors)).T
-        # param.od_ofs = np.random.uniform(0.05, 0.3, (n_samples))
+        if param.fit_e1:
+            param.gr_fp = np.random.uniform(np.array([2000, 2000, 2000, 2000, 2000, 2000, 0, 0]), np.array([6000, 6000, 6000, 6000, 6000, 6000, 200, 200]), (param.n_samples,cbParam.n_reactors)).T
+        else:
+            param.gr_fp = np.random.uniform(0, np.array([0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.1, 0.1]), (param.n_samples,cbParam.n_reactors)).T
+            param.min_fl = np.random.uniform(0, [cbData.fl[r][0] for r in range(cbParam.n_reactors)], (param.n_samples,cbParam.n_reactors)).T
 
     # SIMULATE
-    sim_hrs, cb_dil, fl_init, sim_puti = [], [], [], []
+    sim_hrs, cb_dil, fp_init, sim_puti = [], [], [], []
     sim_fl_train, sim_fl_test = [], []
     s_min = np.zeros(cbParam.n_reactors, dtype=int)
     for j in range(cbParam.n_reactors):
@@ -34,25 +36,34 @@ if __name__ == "__main__":
         dil = np.diff(cbData.p1[j], prepend=[0,0]) > 0.015
         cb_dil.append(dil[:-1])
         sim_puti.append(interpolateCbToSim(cbData.time_h[j], cbData.od[j], sim_hrs[j]))
-        fl_init.append((cbData.fl[j][0] - param.min_fl[j])*(cbData.od[j][0]+param.od_ofs))
+        if param.fit_e1:
+            fp_init.append(cbData.fl[j][0]*cbData.b1[j][0] - param.e1_ofs[j] - param.od_fac*cbData.od[j][0])
+        else:
+            fp_init.append((cbData.fl[j][0] - param.min_fl[j])*(cbData.od[j][0]+param.od_ofs))
 
     if param.mcmc:
         for j in range(cbParam.n_reactors):
             print("Training at temperature: ", cbParam.titles[j])
-            sim_fp = simulateFlProtein(fl_init[j], cbData.time_h[j], sim_hrs[j], cbData.temp[j], sim_puti[j], cb_dil[j], j, param).T
-            sim_fl_train.append(((sim_fp/(cbData.od[j]+np.full((len(cbData.od[j]),param.n_samples),param.od_ofs).T)).T+param.min_fl[j]).T)
-            rmse = np.sqrt(np.mean((sim_fl_train[j] - cbData.fl[j])**2,axis=1))
+            sim_fp = simulateFlProtein(fp_init[j], cbData.time_h[j], sim_hrs[j], cbData.temp[j], sim_puti[j], cb_dil[j], j, param).T
+            if param.fit_e1:
+                sim_fl_train.append(sim_fp + param.e1_ofs[j] + param.od_fac*cbData.od[j])
+                rmse = np.sqrt(np.mean((sim_fl_train[j] - cbData.fl[j]*cbData.b1[j])**2,axis=1))
+            else:
+                sim_fl_train.append(((sim_fp/(cbData.od[j]+np.full((len(cbData.od[j]),param.n_samples),param.od_ofs).T)).T+param.min_fl[j]).T)
+                rmse = np.sqrt(np.mean((sim_fl_train[j] - cbData.fl[j])**2,axis=1))
             s_min[j] = np.argmin(rmse)
 
+        # Print obtrained parameters
+        if not param.fit_e1:
+            param.min_fl = np.array([param.min_fl[j][s_min[j]] for j in range(cbParam.n_reactors)])
+            print("Min Fl:")
+            print(*param.min_fl, sep = ", ")
+
         param.gr_fp = np.array([param.gr_fp[j][s_min[j]] for j in range(cbParam.n_reactors)])
-        param.min_fl = np.array([param.min_fl[j][s_min[j]] for j in range(cbParam.n_reactors)])
         print("Growth rates:")
         print(*param.gr_fp, sep = ", ")
-        print("Min Fl:")
-        print(*param.min_fl, sep = ", ")
-        # print("od_ofs:")
-        # print(*[param.od_ofs[s_min[j]] for j in range(n_reactors)], sep = ", ")
 
+        # Optain, print and plot growth rate model
         gr_model2 = np.poly1d(np.polyfit(tem[:-1], param.gr_fp[:-1], 2))
         gr_model2_all = np.poly1d(np.polyfit(tem, param.gr_fp, 2))
         print("Growth rate model:")
@@ -73,7 +84,7 @@ if __name__ == "__main__":
         ax.set_ylabel('Growth rate [1/h]')
         ax.legend(loc='best')
         ax.set_title("Fluorescent protein growth rate model")
-        fig.savefig(results_dir + "/gr_model.png")
+        fig.savefig(results_dir + "/gr_model{}.png".format("_e1" if param.fit_e1 else ""))
 
         param.Alpha_fp = np.array([gr_model2.coefficients[2]])
         param.Beta_fp = np.array([gr_model2.coefficients[1]])
@@ -83,16 +94,21 @@ if __name__ == "__main__":
     param.mcmc = False
     print("Running with estimated parameters")
     for j in range(cbParam.n_reactors):
-        fl_init_j = (cbData.fl[j][0] - param.min_fl[j])*(cbData.od[j][0]+param.od_ofs)
-        sim_fp = simulateFlProtein(fl_init_j, cbData.time_h[j], sim_hrs[j], cbData.temp[j], sim_puti[j], cb_dil[j], j, param).T
-        sim_fl_test.append(((sim_fp/(cbData.od[j]+np.full((len(cbData.od[j]),param.n_samples),param.od_ofs).T)).T+param.min_fl[j]).T)
+        if param.fit_e1:
+            fp_init_j = cbData.fl[j][0]*cbData.b1[j][0] - param.e1_ofs[j]
+            sim_fp = simulateFlProtein(fp_init_j, cbData.time_h[j], sim_hrs[j], cbData.temp[j], sim_puti[j], cb_dil[j], j, param).T
+            sim_fl_test.append(sim_fp + param.e1_ofs[j] + param.od_fac*cbData.od[j])
+        else:
+            fp_init_j = (cbData.fl[j][0] - param.min_fl[j])*(cbData.od[j][0]+param.od_ofs)
+            sim_fp = simulateFlProtein(fp_init_j, cbData.time_h[j], sim_hrs[j], cbData.temp[j], sim_puti[j], cb_dil[j], j, param).T
+            sim_fl_test.append(((sim_fp/(cbData.od[j]+np.full((len(cbData.od[j]),param.n_samples),param.od_ofs).T)).T+param.min_fl[j]).T)
     param.mcmc = mcmc
     
     # ANALYSIS
     n_rows = math.ceil(cbParam.n_reactors/2)
     n_culumns = 2 if cbParam.n_reactors > 1 else 1
     matplotlib.style.use('default')
-    fig, ax = plt.subplots(n_rows,2,sharey='row')
+    fig, ax = plt.subplots(n_rows,2)
     fig.set_figheight(n_rows*7)
     fig.set_figwidth(n_culumns*10)
     if n_culumns == 1:
@@ -107,12 +123,15 @@ if __name__ == "__main__":
         axr.set_zorder(1)
         ax[r][c].patch.set_visible(False)
 
-        axr.plot(cbData.time_h[j],cbData.temp[j],'r',lw=0.5)
-        # ax[r][c].plot(cbData.time_h[j],cbData.od[j],'k',lw = 0.5, label = 'p. putida od')
-        ax[r][c].plot(cbData.time_h[j],cbData.fl[j],'.g',markersize = 0.8, label = '$fl_{meas}$')
+        axr.plot(cbData.time_h[j],cbData.temp[j],'r',lw=0.5, alpha = 0.4)
+        ax[r][c].plot(cbData.time_h[j],cbData.od[j],'k',lw = 0.5, alpha = 0.4, label = 'p. putida od')
+        if param.fit_e1:
+            ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*cbData.b1[j],'.g',markersize = 0.8, label = '$e1_{meas}$')
+        else:
+            ax[r][c].plot(cbData.time_h[j],cbData.fl[j],'.g',markersize = 0.8, label = '$fl_{meas}$')
         if param.mcmc:
             ax[r][c].plot(cbData.time_h[j],sim_fl_train[j][0],'k',lw = 0.5, label = '$fl_{sim, train}$', alpha = 0.1)
-            for s in range(1,min(param.n_samples,100)):
+            for s in range(1,min(param.n_samples,20)):
                 ax[r][c].plot(cbData.time_h[j],sim_fl_train[j][s],'k',lw = 0.5, alpha = 0.1)
             ax[r][c].plot(cbData.time_h[j],sim_fl_train[j][s_min[j]],'m', lw = 0.7, label = '$fl_{sim, opt}$')
         ax[r][c].plot(cbData.time_h[j],sim_fl_test[j][0],'b',lw = 1, label = '$fl_{sim, model}$')
@@ -122,7 +141,10 @@ if __name__ == "__main__":
 
         ax[r][c].legend(loc="upper left")
         if (c == 0):
-            ax[r][c].set_ylabel("Fluorescense [a.u.]")
+            if param.fit_e1:
+                axr.set_ylabel("Intensity")
+            else:
+                ax[r][c].set_ylabel("Fluorescense [a.u.]")
         else:
             axr.set_ylabel('Temperature [°C]', color='r')
             ax[r][c].tick_params(axis='y', labelleft=True)
@@ -130,7 +152,11 @@ if __name__ == "__main__":
             ax[r][c].set_xlabel("Time [h]")
         axr.tick_params(axis='y', color='r', labelcolor='r')
         ax[r][c].set_xlim([sim_hrs[j][0]-0.5,sim_hrs[j][-1]+0.5])
-        ax[r][c].set_ylim([0,0.5])
+        # ax[r][c].set_ylim([0,0.5])
+        if param.mcmc:
+            ax[r][c].set_ylim([0,1.1*max(max(sim_fl_test[j][0]),max(sim_fl_train[j][s_min[j]]))])
+        else:
+            ax[r][c].set_ylim([0,1.1*max(sim_fl_test[j][0])])
         axr.set_ylim([25,38])
         ax[r][c].set_title(cbParam.titles[j])
     # TODO: Set titles
@@ -138,4 +164,4 @@ if __name__ == "__main__":
     fig.tight_layout()
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir + "/fl_sim_{}.png".format("train" if param.mcmc else "test"))
+    fig.savefig(results_dir + "/fl_sim{}_{}.png".format("_e1" if param.fit_e1 else "","train" if param.mcmc else "test"))

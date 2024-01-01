@@ -66,7 +66,7 @@ def getGrowthRate(temp, parameters):
 
 def getGrowthRateFl(temp, parameters):
     gr = np.array([parameters.Gam_fp*temp**2 + parameters.Beta_fp*temp + parameters.Alpha_fp])
-    gr[gr < 0] = 0
+    gr[gr < 20] = 20
     return gr
             
 
@@ -102,7 +102,7 @@ def simulateCultures(e_init, p_init, cb_hrs, sim_hrs, sim_tem_e, sim_tem_p, para
 
 def simulateFlProtein(fp_init, cb_hrs, sim_hrs, cb_temp, p_puti, dil, r_ind, parameters):
     data_l = len(cb_hrs)
-    n_s = parameters.param.n_samples if parameters.mcmc else 1
+    n_s = parameters.n_samples if parameters.mcmc else 1
     x = np.zeros((data_l,n_s))
     x_curr = fp_init
     k = 0
