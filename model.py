@@ -16,6 +16,7 @@ class CustModel:
         temps = np.full((self.parameters['lag_ind']+1,2),[self.parameters['temp_h'],self.parameters['temp_l']],dtype='float').T
         self.temps = np.full((n_reactors,temps.shape[0],temps.shape[1]),temps)
         self.ts = self.parameters['ts']
+        self.ts_h = self.ts/3600
 
         self.A_dil = np.eye(3)
         self.L_dil = np.eye(3)
@@ -63,12 +64,21 @@ class CustModel:
             else:
                 temp[0:2] = self.temps[:,0]
             # Jacobian of growth
-            self.A = np.array([[1 + self.ts/3600*self.getGrowthRates(temp)[0], 0, 0],
-                      [0, 1 + self.ts/3600*self.getGrowthRates(temp)[1], 0],
-                      [0, self.ts/3600*self.getGrowthRates(temp)[2], 1]])
-            self.L = np.diag([self.ts/3600*x_pred[0], self.ts/3600*x_pred[1], self.ts/3600*x_pred[1]])
+            self.A = np.array([[1 + self.ts_h*self.getGrowthRates(temp)[0], 0, 0],
+                      [0, 1 + self.ts_h*self.getGrowthRates(temp)[1], 0],
+                      [0, self.ts_h*self.getGrowthRates(temp)[2], 1]])
+            self.L = np.diag([self.ts_h*x_pred[0], self.ts_h*x_pred[1], self.ts_h*x_pred[1]])
+
             # Abundance after Ts seconds
-            x_pred = x_pred + self.ts/3600*self.getGrowthRates(temp)*np.array([x_pred[0], x_pred[1], x_pred[1]])
+            # Euler forward (not significantly less accurate than Runge - Kutta 4th order)
+            x_pred = x_pred + self.ts_h*self.getGrowthRates(temp)*np.array([x_pred[0], x_pred[1], x_pred[1]])
+
+            # Runge - Kutta 4th order
+            # k1 = self.getGrowthRates(temp)*np.array([x_pred[0], x_pred[1], x_pred[1]])
+            # k2 = self.getGrowthRates(temp)*np.array([x_pred[0]+self.ts_h/2*k1[0], x_pred[1]+self.ts_h/2*k1[1], x_pred[1]+self.ts_h/2*k1[1]])
+            # k3 = self.getGrowthRates(temp)*np.array([x_pred[0]+self.ts_h/2*k2[0], x_pred[1]+self.ts_h/2*k2[1], x_pred[1]+self.ts_h/2*k2[1]])
+            # k4 = self.getGrowthRates(temp)*np.array([x_pred[0]+self.ts_h*k3[0], x_pred[1]+self.ts_h*k3[1], x_pred[1]+self.ts_h*k3[1]])
+            # x_pred = x_pred + self.ts_h/6*(k1+2*k2+2*k3+k4)
 
             p_pred = self.A @ p_pred @ self.A.T + self.L @ self.parameters['q'] @ self.L.T
 

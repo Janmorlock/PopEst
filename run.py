@@ -163,16 +163,19 @@ if __name__ == "__main__":
         ax[r][c].patch.set_visible(False)
 
         axr.plot(cbData.time_h[j],cbData.temp[j],'--r',lw=0.5,alpha=0.5)
-        # axr.plot(cbData.time_h[j],sim_tem_e[j],'r',lw=1)
-        axr.hlines(critTemp,cbData.time_h[j][0]-1,cbData.time_h[j][-1]+1,'r',lw=0.5)
+        axr.hlines(critTemp,cbData.time_h[j][0]-1,cbData.time_h[j][-1]+1,'r',lw=0.5,alpha=0.5)
+
+        ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],100-cbParam.cb_fc_ec[j], 'gx', markersize = 10, label = '$puti_{fc}$')
         ax[r][c].plot(cbData.time_h[j],(cbData.fl[j]-model.parameters['min_fl'][j])/(model.parameters['max_fl'][j]-model.parameters['min_fl'][j])*100,'.g',markersize = 0.8, alpha = 0.5, label = '$puti_{est,old}$')
         ax[r][c].plot(cbData.time_h[j],p_puti_pred_percent, '--g', lw = 0.8, label = '$puti_{pred}$')
         ax[r][c].plot(cbData.time_h[j],p_puti_percent, 'g', lw = 1.2, label = '$puti_{est}$')
-        ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],100-cbParam.cb_fc_ec[j], 'gx', markersize = 10, label = '$puti_{fc}$')
-        ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'--m',lw = 0.8, label = '$fl_{pred}*100$')
-        ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'m',lw = 0.8, label = '$fl_{est}*100$')
-        ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.k',markersize = 0.8, label = '$fl_{meas}*100$')
-        ax[r][c].plot(cbData.time_h[j],od*100,'-k',lw = 0.5, alpha = 0.5, label = '$od_{est}*100$')
+
+        ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.m',markersize = 0.8,label = '$fl_{meas}*100$')
+        ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}*100$')
+        ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,color = '#0000ff',lw = 1.2, label = '$fl_{est}*100$')
+
+        ax[r][c].plot(cbData.time_h[j],cbData.od[j]*100,'.k',markersize = 0.8, alpha = 0.5, label = '$od_{meas}*100$')
+        ax[r][c].plot(cbData.time_h[j],od*100,'k',lw = 0.5, alpha = 1, label = '$od_{est}*100$')
         # ax[r][c].fill_between(cbData.time_h[j], p_puti_percent-p_puti_per_sigma, p_puti_percent+p_puti_per_sigma, color='g',alpha=0.2)
 
         ax[r][c].legend(loc="upper left")
@@ -205,4 +208,4 @@ if __name__ == "__main__":
     results_dir = "Images/{}".format(data_name)
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_od.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''))
+    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_od.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''),transparent=True)

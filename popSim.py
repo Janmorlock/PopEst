@@ -93,8 +93,15 @@ def simulateCultures(e_init, p_init, cb_hrs, sim_hrs, sim_tem_e, sim_tem_p, para
             x_curr = dilute(x_curr, parameters)
             k += 1
         
-        # Let them grow
-        x_curr *= 1 + parameters.Ts/3600*getGrowthRate([sim_tem_e[i],sim_tem_p[i],0], parameters).T
+        # Euler forward (less accurate)
+        # x_curr *= 1 + parameters.Ts/3600*getGrowthRate([sim_tem_e[i],sim_tem_p[i]], parameters).T
+            
+        # Runge - Kutta 4th order
+        k1 = getGrowthRate([sim_tem_e[i],sim_tem_p[i]], parameters).T*x_curr
+        k2 = getGrowthRate([sim_tem_e[i],sim_tem_p[i]], parameters).T*(x_curr+parameters.Ts/3600/2*k1)
+        k3 = getGrowthRate([sim_tem_e[i],sim_tem_p[i]], parameters).T*(x_curr+parameters.Ts/3600/2*k2)
+        k4 = getGrowthRate([sim_tem_e[i],sim_tem_p[i]], parameters).T*(x_curr+parameters.Ts/3600*k3)
+        x_curr = x_curr + parameters.Ts/3600/6*(k1+2*k2+2*k3+k4)
     
     x[k,:,:] = x_curr
     return x
@@ -113,11 +120,20 @@ def simulateFlProtein(fp_init, cb_hrs, sim_hrs, cb_temp, p_puti, dil, r_ind, par
             if dil[k]:
                 x_curr -= parameters.dil_amount/parameters.dil_th*x_curr
             k += 1
-            # log
         if parameters.mcmc:
-            x_curr = x_curr + parameters.Ts/3600*parameters.gr_fp[r_ind]*p_puti[i]
+            gr = parameters.gr_fp[r_ind]
         else:
-            x_curr = x_curr + parameters.Ts/3600*getGrowthRateFl(cb_temp[k-1], parameters)*p_puti[i]
+            gr = getGrowthRateFl(cb_temp[k-1], parameters)
+        
+        # Euler forward (not significantly less accurate than Runge - Kutta 4th order)
+        x_curr = x_curr + parameters.Ts/3600*gr*p_puti[i]
+        
+        # Runge - Kutta 4th order
+        # k1 = gr*p_puti[i]
+        # k2 = gr*(p_puti[i]+parameters.Ts/3600/2*k1)
+        # k3 = gr*(p_puti[i]+parameters.Ts/3600/2*k2)
+        # k4 = gr*(p_puti[i]+parameters.Ts/3600*k3)
+        # x_curr = x_curr + parameters.Ts/3600/6*(k1+2*k2+2*k3+k4)
     
     x[k] = x_curr
     return x

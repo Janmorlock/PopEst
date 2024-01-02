@@ -40,8 +40,8 @@ class Params:
             'e_rel_init' : 0.5, # %, initial relative belief of e. coli abundance
             'fp_init' : 0.056, # initial belief of fluorescence
 
-            'sigma_e_init' : 0.01,
-            'sigma_p_init' : 0.01,
+            'sigma_e_init' : 0.03,
+            'sigma_p_init' : 0.03,
             'sigma_fp_init' : 0.07,
 
             # Process noise standard deviation
@@ -56,7 +56,7 @@ class Params:
             'q' : np.zeros((3,3)),
 
             # Measurement noise standard deviation
-            'sigma_od' : 1e-1,
+            'sigma_od' : 5e-2,
             'sigma_fl' : 1e-1,
             'r' : np.zeros((1,1))
         }

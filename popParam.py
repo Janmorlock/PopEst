@@ -28,7 +28,7 @@ class ModParam:
         self.od_fac = 200
         self.n_samples = 10000
         self.fit_e1 = True
-        self.mcmc = False
+        self.mcmc = True
 
         # Linear line fitting to 062_5 data (without 36°C)
         self.Beta_e = np.array([0.08388]) # -0.45

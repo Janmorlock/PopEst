@@ -12,7 +12,7 @@ from paramsData import CbDataParam
 
 if __name__ == "__main__":    
     # SPECIFY DATA
-    dataName = '067-3'
+    dataName = '062-4'
     cbParam = CbDataParam(dataName)
     tem = [26, 27, 29, 30, 31, 33, 35, 37]
     results_dir = "Images/{}".format(dataName)
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     param = ModParam()
     if param.mcmc:
         if param.fit_e1:
-            param.gr_fp = np.random.uniform(np.array([2000, 2000, 2000, 2000, 2000, 2000, 0, 0]), np.array([6000, 6000, 6000, 6000, 6000, 6000, 200, 200]), (param.n_samples,cbParam.n_reactors)).T
+            param.gr_fp = np.random.uniform(np.array([2000, 2000, 2000, 2000, 2000, 2000, 0, 0]), np.array([5000, 5000, 5000, 5000, 5000, 5000, 200, 200]), (param.n_samples,cbParam.n_reactors)).T
         else:
             param.gr_fp = np.random.uniform(0, np.array([0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 0.1, 0.1]), (param.n_samples,cbParam.n_reactors)).T
             param.min_fl = np.random.uniform(0, [cbData.fl[r][0] for r in range(cbParam.n_reactors)], (param.n_samples,cbParam.n_reactors)).T
@@ -64,27 +64,30 @@ if __name__ == "__main__":
         print(*param.gr_fp, sep = ", ")
 
         # Optain, print and plot growth rate model
-        gr_model2 = np.poly1d(np.polyfit(tem[:-1], param.gr_fp[:-1], 2))
+        gr_model1 = np.poly1d(np.polyfit(tem[:-3], param.gr_fp[:-3], 1))
+        gr_model2 = np.poly1d(np.polyfit(tem[4:-1], param.gr_fp[4:-1], 2))
         gr_model2_all = np.poly1d(np.polyfit(tem, param.gr_fp, 2))
         print("Growth rate model:")
         print(*gr_model2.coefficients, sep = ", ")
         x_mod = np.linspace(param.temp_l, param.temp_h, 110)
 
+        y1 = gr_model1(x_mod)
+        y2 = gr_model2(x_mod)
         y_all = gr_model2_all(x_mod)
-        y_all[y_all < 0] = 0
-        y = gr_model2(x_mod)
-        y[y < 0] = 0
+        y_all[y_all < 20] = 20
+        y2[y2 < 20] = 20
         fig, ax = plt.subplots()
         fig.set_figheight(7)
         fig.set_figwidth(10)
         ax.plot(tem, param.gr_fp, 'om', label = 'data')
-        ax.plot(x_mod, y, '-b', label = '2nd order poly')
+        ax.plot(x_mod, y1, '-b')
+        ax.plot(x_mod, y2, '-b', label = '1st and 2nd order pw poly')
         ax.plot(x_mod, y_all, '-k', label = '2nd order poly all')
         ax.set_xlabel('Temperature [°C]')
         ax.set_ylabel('Growth rate [1/h]')
         ax.legend(loc='best')
         ax.set_title("Fluorescent protein growth rate model")
-        fig.savefig(results_dir + "/gr_model{}.png".format("_e1" if param.fit_e1 else ""))
+        fig.savefig(results_dir + "/gr_model{}_pw.png".format("_e1" if param.fit_e1 else ""))
 
         param.Alpha_fp = np.array([gr_model2.coefficients[2]])
         param.Beta_fp = np.array([gr_model2.coefficients[1]])
