@@ -72,18 +72,12 @@ if __name__ == "__main__":
 
     # SPECIFY DATA
     data_name = '064-2-test'
-    filter = 'ekf'
     cbParam = CbDataParam(data_name)
     cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
 
     # Initialize the model
     model_pred = CustModel(cbParam.n_reactors)
-    if (filter == 'ucf'):
-        model = CustProgModel()
-    elif (filter == 'ekf'):
-        model = CustModel(cbParam.n_reactors)
-    else:
-        raise Exception("Invalid filter type")
+    model = CustModel(cbParam.n_reactors)
 
     critTemp = getCritTemp()[0]
     assert(26 < critTemp and critTemp < 37)
@@ -95,32 +89,18 @@ if __name__ == "__main__":
     for j in range(cbParam.n_reactors):
         # Construct State estimator
         est_pred = EKF(model_pred, j, update = False)
-        if (filter == 'ucf'):
-            x0 = model.initialize()
-            # Turn into a distribution - this represents uncertainty in the initial state
-            # Construct covariance matrix (making sure each value is positive)
-            cov = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
-            est = UnscentedKalmanFilter(model, x0, dt = 1, Q = model.parameters['q'], R = model.parameters['r'])
-            x0 = MultivariateNormalDist(x0.keys(), x0.values(), cov)
-        elif (filter == 'ekf'):
-            est = EKF(model, j)
+        est = EKF(model, j)
         for k in range(len(cbData.time[j])):
             # Run the filter
             u_pred = cbData.temp[j][k]
             est_pred.estimate(cbData.time[j][k], u_pred)
             estimates_pred[j].append(est_pred.est)
-            if (filter == 'ucf'):
-                u = model.InputContainer({'temp': cbData.temp[j][k]})
-                measurements = model.OutputContainer({'fl': cbData.fl[j][k], 'od': cbData.od[j][k]})
-                est.estimate(cbData.time[j][k], u, measurements)
-                estimates[j].append(est.x.mean)
-                variances[j].append(est.x.cov)
-            elif (filter == 'ekf'):
-                u = cbData.temp[j][k]
-                y = np.array([cbData.od[j][k]])
-                est.estimate(cbData.time[j][k], u, y)
-                estimates[j].append(est.est)
-                variances[j].append(est.var)
+
+            u = cbData.temp[j][k]
+            y = np.array([cbData.od[j][k]])
+            est.estimate(cbData.time[j][k], u, y)
+            estimates[j].append(est.est)
+            variances[j].append(est.var)
 
             if k == len(cbData.time[j])-1:
                 print("Final variance ({}): {}".format(j, variances[j][k]))
