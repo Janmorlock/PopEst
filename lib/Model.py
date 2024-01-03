@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple
 
-from params import Params
+from ..config.params import Params
 
 # initialize
 class CustModel:

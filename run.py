@@ -2,17 +2,13 @@ import numpy as np
 from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
 import matplotlib
-import glob
-import pandas as pd
 import math
 import os
-from progpy.state_estimators import UnscentedKalmanFilter
-from progpy.uncertain_data import MultivariateNormalDist
 
-from estimator import EKF
 from paramsData import CbDataParam
-from newModel import CustProgModel
-from model import CustModel
+from lib.CbData import CbData
+from lib.Estimator import EKF
+from lib.Model import CustModel
 
 def f(xy, model = CustModel(1)):
     x, y = xy
@@ -40,33 +36,6 @@ def plotGrowthRates(model):
     plt.savefig("Images/growthRates_<critT>.png")
     return
 
-class CbData:
-    def __init__(self, path, file_ind, scope, n_reactors):
-        cb_files = sorted(glob.glob(path + "/*.csv"))
-        cb_dfs = []
-        for i in file_ind:
-            df = pd.read_csv(cb_files[i], index_col=None, header=0)
-            cb_dfs.append(df)
-
-        self.time, self.time_h, self.od, self.temp, self.fl, self.p1 = [], [], [], [], [], []
-        self.hr, self.b1, self.temp_sp, self.temp_ext, self.temp_int, self.fl2,  self.p2 = [], [], [], [], [], [], []
-        for j in range(n_reactors):
-            time = cb_dfs[j]["exp_time"][scope[j][0]:scope[j][-1]+1].to_numpy()
-            self.time.append(time-time[0])
-            self.time_h.append(self.time[j]/3600)
-            od = cb_dfs[j]["od_measured"][scope[j][0]:scope[j][-1]+1].to_numpy()
-            od[od < 0.005] = 0.005
-            self.od.append(od)
-            self.temp.append(cb_dfs[j]["media_temp"][scope[j][0]:scope[j][-1]+1].to_numpy())
-            self.fl.append(cb_dfs[j]["FP1_emit1"][scope[j][0]:scope[j][-1]+1].to_numpy())
-            self.p1.append(cb_dfs[j]["pump_1_rate"][scope[j][0]:scope[j][-1]+1].to_numpy())
-            self.hr.append(cb_dfs[j]["heating_rate"][scope[j][0]:scope[j][-1]+1].to_numpy())
-            self.b1.append(cb_dfs[j]["FP1_base"][scope[j][0]:scope[j][-1]+1].to_numpy())
-            self.temp_sp.append(cb_dfs[j]["thermostat_setpoint"][scope[j][0]:scope[j][-1]+1].to_numpy())
-            self.temp_ext.append(cb_dfs[j]["external_air_temp"][scope[j][0]:scope[j][-1]+1].to_numpy())
-            self.temp_int.append(cb_dfs[j]["internal_air_temp"][scope[j][0]:scope[j][-1]+1].to_numpy())
-            self.fl2.append(cb_dfs[j]["FP1_emit2"][scope[j][0]:scope[j][-1]+1].to_numpy())
-            self.p2.append(cb_dfs[j]["pump_2_rate"][scope[j][0]:scope[j][-1]+1].to_numpy())
 
 if __name__ == "__main__":
 
@@ -187,7 +156,6 @@ if __name__ == "__main__":
         ax[r][c].set_xlim([cbData.time_h[j][0]-0.5,cbData.time_h[j][-1]+0.5])
         ax[r][c].set_ylim([-5,105])
         ax[r][c].set_title(cbParam.titles[j])
-    # TODO: Set titles
     fig.suptitle(data_name)
     fig.tight_layout()
     results_dir = "Images/{}".format(data_name)
