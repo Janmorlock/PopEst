@@ -157,6 +157,8 @@ if __name__ == "__main__":
         sq = e_coli**2/p_puti**2*var[:,1,1] + var[:,0,0] - 2*e_coli/p_puti*np.sign(var[:,0,1])*np.sqrt(np.abs(var[:,0,1]))
         p_puti_per_sigma = np.abs(p_puti_percent/(e_coli+p_puti))*np.sqrt(np.abs(sq))
 
+        max_fl = max(cbData.fl[j]*cbData.b1[j])/100
+
         axr = ax[r][c].twinx()
         ax[r][c].set_zorder(2)
         axr.set_zorder(1)
@@ -170,9 +172,12 @@ if __name__ == "__main__":
         ax[r][c].plot(cbData.time_h[j],p_puti_pred_percent, '--g', lw = 0.8, label = '$puti_{pred}$')
         ax[r][c].plot(cbData.time_h[j],p_puti_percent, 'g', lw = 1.2, label = '$puti_{est}$')
 
-        ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.m',markersize = 0.8,label = '$fl_{meas}*100$')
-        ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}*100$')
-        ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,color = '#0000ff',lw = 1.2, label = '$fl_{est}*100$')
+        # ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.m',markersize = 0.8,label = '$fl_{meas}*100$')
+        # ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}*100$')
+        # ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,color = '#0000ff',lw = 1.2, label = '$fl_{est}*100$')
+        ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*cbData.b1[j]/max_fl,'.m',markersize = 0.8,label = '$fl_{meas}$')
+        ax[r][c].plot(cbData.time_h[j],(fp_pred + model.parameters['od_fac']*od_pred + model.parameters['e1_ofs'])/max_fl,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}$')
+        ax[r][c].plot(cbData.time_h[j],(fp + model.parameters['od_fac']*od + model.parameters['e1_ofs'])/max_fl,color = '#0000ff',lw = 1.2, label = '$fl_{est}$')
 
         ax[r][c].plot(cbData.time_h[j],cbData.od[j]*100,'.k',markersize = 0.8, alpha = 0.5, label = '$od_{meas}*100$')
         ax[r][c].plot(cbData.time_h[j],od*100,'k',lw = 0.5, alpha = 1, label = '$od_{est}*100$')
@@ -208,4 +213,4 @@ if __name__ == "__main__":
     results_dir = "Images/{}".format(data_name)
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_od.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''),transparent=True)
+    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_od_e1.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''),transparent=True)
