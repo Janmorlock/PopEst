@@ -46,21 +46,20 @@ class Params:
 
             'sigma_e_init' : 0.03,
             'sigma_p_init' : 0.03,
-            'sigma_fp_init' : 0.07,
+            'sigma_fp_init' : 20, # 0.07
 
             # Process noise standard deviation
             'sigma_e_dil' : 1e-2,
             'sigma_p_dil' : 1e-2,
-            'sigma_fp_dil' : 1e-2,
+            'sigma_fp_dil' : 1e2,
             'q_dil' : np.zeros((3,3)),
-            'sigma_e' : 1e-2,
-            'sigma_p' : 1e-2,
-            'sigma_fp' : 1e-2,
-            'sigma_fl_ofs' : 1e-1,
+            'sigma_e' : 1e-4,
+            'sigma_p' : 1e-4,
+            'sigma_fp' : 5e5,
             'q' : np.zeros((3,3)),
 
             # Measurement noise standard deviation
             'sigma_od' : 5e-2,
-            'sigma_fl' : 1e-1,
-            'r' : np.zeros((1,1))
+            'sigma_fl' : 1e1,
+            'r' : np.zeros((2,2))
         }

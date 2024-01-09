@@ -21,21 +21,6 @@ def getCritTemp():
     temp = fsolve(f, [33.0, 0.8])
     return temp
 
-def plotGrowthRates(model):
-    temp = np.full((3,11),np.arange(model.parameters.temp_l,model.parameters.temp_h,1))
-    gr = model.getGrowthRates(temp)
-    critT = getCritTemp()[0]
-    plt.plot(temp[0],gr[0],'-xb',label='E coli.')
-    plt.plot(temp[0],gr[1],'-xg',label='P. Putida')
-    plt.plot(temp[0],gr[2],'-xk',label='Fl. Protein')
-    plt.vlines(critT,0,1,colors='r',label='Critical Temperature')
-    plt.xlim(model.parameters.temp_l-1,model.parameters.temp_h+1)
-    plt.xlabel("Temperature [°C]")
-    plt.ylabel("Growth Rate [$h^{-1}$]")
-    plt.legend()
-    plt.savefig("Images/growthRates_<critT>.png")
-    return
-
 
 if __name__ == "__main__":
 
@@ -66,7 +51,7 @@ if __name__ == "__main__":
             estimates_pred[j].append(est_pred.est)
 
             u = cbData.temp[j][k]
-            y = np.array([cbData.od[j][k]])
+            y = np.array([cbData.od[j][k], cbData.fl[j][k]*cbData.b1[j][k]])
             est.estimate(cbData.time[j][k], u, y)
             estimates[j].append(est.est)
             variances[j].append(est.var)
@@ -124,6 +109,7 @@ if __name__ == "__main__":
         # ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.m',markersize = 0.8,label = '$fl_{meas}*100$')
         # ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}*100$')
         # ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,color = '#0000ff',lw = 1.2, label = '$fl_{est}*100$')
+
         ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*cbData.b1[j]/max_fl,'.m',markersize = 0.8,label = '$fl_{meas}$')
         ax[r][c].plot(cbData.time_h[j],(fp_pred + model.parameters['od_fac']*od_pred + model.parameters['e1_ofs'])/max_fl,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}$')
         ax[r][c].plot(cbData.time_h[j],(fp + model.parameters['od_fac']*od + model.parameters['e1_ofs'])/max_fl,color = '#0000ff',lw = 1.2, label = '$fl_{est}$')
@@ -161,4 +147,4 @@ if __name__ == "__main__":
     results_dir = "Images/{}".format(data_name)
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir+"/{}_{}r_{}h{}lag_od_e1.png".format(filter,cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''),transparent=True)
+    fig.savefig(results_dir+"/ekf_{}r_{}h{}lag_e1.png".format(cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''),transparent=True)

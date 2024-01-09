@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple
 
-from ..config.params import Params
+from config.params import Params
 
 # initialize
 class CustModel:
@@ -9,7 +9,7 @@ class CustModel:
         self.parameters = Params().default
 
         self.parameters['lag_ind'] = int(self.parameters['lag']*3600/self.parameters['ts']) # Lag indeces
-        self.parameters['r'] = np.diag([self.parameters['sigma_od']**2])
+        self.parameters['r'] = np.diag([self.parameters['sigma_od']**2, self.parameters['sigma_fl']**2])
         self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
         self.parameters['q_dil'] = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
 
@@ -24,8 +24,8 @@ class CustModel:
         self.A = np.eye(3)
         self.L = np.eye(3)
 
-        self.H = np.zeros((1,3))
-        self.M = np.eye(1)
+        self.H = np.zeros((2,3))
+        self.M = np.eye(2)
 
 
     def dilute(self, x_prev: np.ndarray, p_prev: np.ndarray):
@@ -87,17 +87,16 @@ class CustModel:
     def update(self, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray) -> Tuple[dict, np.ndarray]:
         x_pred = np.fromiter(x_pred_dic.values(),dtype=float)
         od = x_pred[0] + x_pred[1]
-        # self.H = np.array([[-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])],
-        #                    [1, 1, 0]])
-        self.H = np.array([[1, 1, 0]])
+        self.H = np.array([[1, 1, 0],
+                           [self.parameters['od_fac'], self.parameters['od_fac'], 1]]) # [-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])]
         # K = np.linalg.solve(self.H @ p_pred.T @ self.H.T + self.M @ self.parameters['r'].T @ self.M.T, self.H @ p_pred.T).T
         K = p_pred @ self.H.T @ np.linalg.inv(self.H @ p_pred @ self.H.T + self.M @ self.parameters['r'] @ self.M.T)
-        # y_est = np.array([x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind], od])
-        y_est = np.array([od])
+        y_est = np.array([od, x_pred[2] + self.parameters['od_fac']*od + self.parameters['e1_ofs']]) # x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind]
         xm = x_pred + K @ (y - y_est)
         xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
         Pm = (np.eye(3) - K @ self.H) @ p_pred
 
+        # Constrain states to be positive
         if xm[0] < 0:
             xm[1] += xm[0]
             xm[0] = 1e-4
@@ -116,6 +115,6 @@ class CustModel:
         gr_e = self.parameters['beta_e']*temp[0] + self.parameters['alpha_e']
         gr_p = self.parameters['del_p']*temp[1]**3 + self.parameters['gam_p']*temp[1]**2 + self.parameters['beta_p']*temp[1] + self.parameters['alpha_p']
         gr_f = self.parameters['gr_fp'][0]*temp[2]**2 + self.parameters['gr_fp'][1]*temp[2] + self.parameters['gr_fp'][2]
-        gr_f = max(0,gr_f)
+        gr_f = max(20,gr_f)
 
         return np.array([gr_e, gr_p, gr_f])

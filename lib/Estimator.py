@@ -82,4 +82,4 @@ class EKF:
             if abs(self.est['e'] + self.est['p'] - y[0]) < 0.1:
                 self.est, self.var = self.model.update(self.est, self.var, y)
             else:
-                print('od update discared [{}] [{}:{}]'.format(self.r_ind, math.floor(time/3600), math.floor((time/3600-math.floor(time/3600))*60)))
+                print('no measurement update [{}] [{}:{}]'.format(self.r_ind, math.floor(time/3600), math.floor((time/3600-math.floor(time/3600))*60)))
