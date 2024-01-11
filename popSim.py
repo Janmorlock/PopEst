@@ -6,7 +6,7 @@ import scipy.signal as ss
 from scipy.optimize import fsolve
 
 from popParam import ModParam
-from lib.CbData import CbData
+from CbData import CbData
 from paramsData import CbDataParam
 
 param = ModParam()

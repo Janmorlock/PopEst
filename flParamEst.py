@@ -6,7 +6,7 @@ import os
 
 from popParam import ModParam
 from popSim import simulateFlProtein, interpolateCbToSim
-from lib.CbData import CbData
+from CbData import CbData
 from paramsData import CbDataParam
 
 

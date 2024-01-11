@@ -6,7 +6,7 @@ import math
 import os
 
 from paramsData import CbDataParam
-from lib.CbData import CbData
+from CbData import CbData
 from lib.Estimator import EKF
 from lib.Model import CustModel
 
