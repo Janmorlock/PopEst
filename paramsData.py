@@ -78,11 +78,45 @@ class CbDataParam:
             case '067-3':
                 path = '../../Ting/Experiments/067-3'
                 # Indeces of files of interest
-                file_ind = [0,1]
+                file_ind = [0,1,2,3]
                 n_reactors = len(file_ind)
                 # Sampcycle indices as in Matlab
                 sampcycle = np.array([[0,1800] for i in range(n_reactors)])
-                titles = ['C9M0','C9M1']
+                titles = ['C9M0','C9M1','C9M2','C9M3']
+            case '067-4':
+                path = '../../Ting/Experiments/067-4'
+                # Indeces of files of interest
+                file_ind = [0,1,2,3]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1800] for i in range(n_reactors)])
+                titles = ['C8M0','C8M1','C6M0','C6M1']
+            case '074-1':
+                path = '../../Ting/Experiments/074-1'
+                # Indeces of files of interest
+                file_ind = [0,1,2,3]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1800] for i in range(n_reactors)])
+                titles = ['C6M0','C6M1','C6M2','C6M3']
+            case '075-1':
+                path = '../../Ting/Experiments/075-1'
+                # Indeces of files of interest
+                file_ind = [4,5,6,7,8,10,12,14,9,11,13,15,0,1,2,3]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1800] for i in range(n_reactors)])
+                sampcycle[12:15] = np.array([[0,1000] for i in range(3)])
+                sampcycle[1] = np.array([0,800])
+                titles = ['C7M0','C7M1','C7M2','C7M3','C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3','C6M0','C6M1','C6M2','C6M3']
+            case '076-1':
+                path = '../../Ting/Experiments/076-1'
+                # Indeces of files of interest
+                file_ind = [8,9,10,11,12]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1800] for i in range(n_reactors)])
+                titles = ['C7M0','C7M1','C7M2','C7M3','C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3','C6M0','C6M1','C6M2','C6M3']
             case _:
                 raise Exception('Data information of {} not given.'.format(dataName))
         

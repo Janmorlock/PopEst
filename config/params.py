@@ -3,13 +3,12 @@ import numpy as np
 class Params:
     def __init__(self):
         self.default = {  # Set default parameters
-            'temp_l' : 26,
-            'temp_h' : 37,
+            'temp_pre_e' : 37,
+            'temp_pre_p' : 26,
 
             'od_setpoint' : 0.5,
 
             'ts' : 1, # seconds
-            'dt' : 1, # seconds
 
             'avg_temp' : True,
             'lag' : 3, # hours
@@ -23,19 +22,14 @@ class Params:
 
 
             ### Growth rate parameters
-            # Linear line fitting to 062_5 data (without 36°C)
-            'beta_e' : 0.08388,
-            'alpha_e' : -1.934,
+            # Linear line fitting to 075_1 data
+            'gr_e' : [0.08023, -1.81796],
 
-            # Cubic line fitting to 062_5 data
-            'del_p' : -0.001184,
-            'gam_p' :  0.09397,
-            'beta_p' : -2.413,
-            'alpha_p' : 20.74,
+            # Quadratic line fitting to 075_1 data
+            'gr_p' : [-0.02087, 1.30128, -19.31919],
 
             # Quadratic line fitting to 062_4 data
-            # 'gr_fp' : [-0.00997995390810818, 0.5878457848575587, -8.328492791512256],
-            'gr_fp' : [-138.38010305512265, 8199.738520671823, -116924.32600350716],
+            'gr_fp' : [-0.00997995390810818, 0.5878457848575587, -8.328492791512256],
 
 
             ### Parameters for the Kalman filter

@@ -13,7 +13,7 @@ class CustModel:
         self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
         self.parameters['q_dil'] = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
 
-        temps = np.full((self.parameters['lag_ind']+1,2),[self.parameters['temp_h'],self.parameters['temp_l']],dtype='float').T
+        temps = np.full((self.parameters['lag_ind']+1,2),[self.parameters['temp_pre_e'],self.parameters['temp_pre_p']],dtype='float').T
         self.temps = np.full((n_reactors,temps.shape[0],temps.shape[1]),temps)
         self.ts = self.parameters['ts']
         self.ts_h = self.ts/3600
@@ -112,9 +112,9 @@ class CustModel:
         """
         Given the temperatures, return the corresponding growth rates
         """
-        gr_e = self.parameters['beta_e']*temp[0] + self.parameters['alpha_e']
-        gr_p = self.parameters['del_p']*temp[1]**3 + self.parameters['gam_p']*temp[1]**2 + self.parameters['beta_p']*temp[1] + self.parameters['alpha_p']
+        gr_e = self.parameters['gr_e'][0]*temp[0] + self.parameters['gr_e'][1]
+        gr_p = self.parameters['gr_p'][0]*temp[1]**2 + self.parameters['gr_p'][1]*temp[1] + self.parameters['gr_p'][2]
         gr_f = self.parameters['gr_fp'][0]*temp[2]**2 + self.parameters['gr_fp'][1]*temp[2] + self.parameters['gr_fp'][2]
-        gr_f = max(20,gr_f)
+        gr_f = max(0,gr_f)
 
         return np.array([gr_e, gr_p, gr_f])
