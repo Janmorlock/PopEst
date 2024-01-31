@@ -4,11 +4,12 @@ import pandas as pd
 class CbDataParam:
     def __init__(self, dataName):
         self.dataName = dataName
-        self.path, self.file_ind, self.sampcycle, self.titles = self.getCbDataParam(dataName)
+        self.path, self.file_ind, self.sampcycle, self.titles, self.reactors = self.getCbDataParam(dataName)
         self.n_reactors = len(self.file_ind)
         self.cb_fc_ec = getFcData(dataName)
 
     def getCbDataParam(self, dataName):
+        reactors = []
         match dataName:
             case '064-1':
                 path = '../../Ting/Experiments/064-1'
@@ -109,6 +110,7 @@ class CbDataParam:
                 sampcycle[12:15] = np.array([[0,1000] for i in range(3)])
                 sampcycle[1] = np.array([0,800])
                 titles = ['C7M0','C7M1','C7M2','C7M3','C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3','C6M0','C6M1','C6M2','C6M3']
+                reactors = ['Faith', 'Alabama', 'Arthur', 'Allan', 'Morlock', 'Swift', 'Stacey', 'George', 'Tammy', 'Taylor', 'Garth', 'Willi', 'Reba', 'Shania', 'Johnny', 'Dolly', 'Carrie', 'Allan', 'Arthur', 'Morlock', 'Swift']
             case '076-1':
                 path = '../../Ting/Experiments/076-1'
                 # Indeces of files of interest
@@ -120,7 +122,7 @@ class CbDataParam:
             case _:
                 raise Exception('Data information of {} not given.'.format(dataName))
         
-        return path, file_ind, sampcycle, titles
+        return path, file_ind, sampcycle, titles, reactors
 
 def getFcData(dataName):
     match dataName:
