@@ -51,7 +51,6 @@ if __name__ == "__main__":
             dil = np.diff(cbData.p1[j], prepend=[0,0]) > 0.015
             # Resize data
             r = 0
-            od_log = np.log(cbData.od[j])
             od_list = []
             time_h_list = []
             temp_sp_beg = cbData.temp_sp[j][0]
@@ -73,7 +72,7 @@ if __name__ == "__main__":
                     time_h_list = []
                     temp_sp_beg = cbData.temp_sp[j][i]
                 if gr_constant:
-                    od_list.append(od_log[i])
+                    od_list.append(cbData.od[j][i])
                     time_h_list.append(cbData.time_h[j][i])
             temps += list(set(temp_sp_mat))
             # Fit lines and get growth rates
@@ -81,7 +80,7 @@ if __name__ == "__main__":
                 time_h_mat[r] = time_h_mat[r][3:]
                 od_mat[r] = od_mat[r][3:]
                 if len(od_mat[r]) > 5:
-                    fit = np.poly1d(np.polyfit(time_h_mat[r], od_mat[r], 1))
+                    fit = np.poly1d(np.polyfit(time_h_mat[r], np.log(od_mat[r]), 1, w = np.sqrt(od_mat[r])))
                     gr_fit.append(fit)
                     gr[counter].append(fit.coefficients[0])
                     temp_sp[counter].append(temp_sp_mat[r])
@@ -130,8 +129,8 @@ if __name__ == "__main__":
         median[b] = [np.median(grs[t]) for t in range(len(grs))]
         std[b] = [np.std(grs[t]) for t in range(len(grs))]
     # Fit growth rates
-    p_model = np.poly1d(np.polyfit(temps, median[0], 2, w=1/np.array(std[0])))
-    e_model = np.poly1d(np.polyfit(temps, median[1], 1, w=1/np.array(std[1])))
+    p_model = np.poly1d(np.polyfit(temps, mean[0], 2, w=1/np.array(std[0])))
+    e_model = np.poly1d(np.polyfit(temps, mean[1], 1, w=1/np.array(std[1])))
     p_coefficients = np.round(p_model.coefficients, 5)
     e_coefficients = np.round(e_model.coefficients, 5)
     print("P. putida growth rate fit:")
