@@ -9,14 +9,14 @@ from config.params import Params
 from CbData import CbData
 from paramsData import CbDataParam
 
-def simulateFlProtein(cb_hrs, fp_init, p_puti, dil, temp, parameters, temp_lst = np.empty, gr = np.empty, train = False, e = np.empty(1), err = []):
+def simulateFlProtein(cb_hrs, fp_init, p_puti, dil, temp, parameters, temp_lst = np.empty, gr = np.empty, train = False, fp = np.empty(1), err = []):
     data_l = len(p_puti)
     n_s = gr.shape[1] if train else 1
     x = np.zeros((data_l,n_s))
     x_curr = fp_init
     k = 0
     dil_th = 0.55
-    dil_am = 0.14
+    dil_am = 0.12
     temp_ind = 0
     dilute = False
 
@@ -33,11 +33,11 @@ def simulateFlProtein(cb_hrs, fp_init, p_puti, dil, temp, parameters, temp_lst =
             x_curr = x_curr + dt*gr[temp_ind]*p_puti[k]
         else:
             gr = parameters['gr_fp'][0]*temp[k]**2 + parameters['gr_fp'][1]*temp[k] + parameters['gr_fp'][2]
-            gr = max(gr,200)
+            gr = max(gr,100)
             x_curr = x_curr + dt*gr*p_puti[k]
         x[k] = x_curr
         if train:
-            err[temp_ind].append(x_curr-e[k])
+            err[temp_ind].append(x_curr-fp[k])
         
         if dil[k] and not dil[max(0,k-1)]:
             dilute = True
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     cbParam.sampcycle[1] = [0,100]
     train = True
 
-    n_samples = 20000
+    n_samples = 10000
     
     # Get occuring temperatures
     cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
@@ -79,9 +79,9 @@ if __name__ == "__main__":
     gr_fig.set_figwidth(10)
             
     ### Brute-force search of production rates
-    sim_fl_train, gr_fp_opt = [], []
+    sim_e_train, sim_fl_opt, pr_fp_opt = [], [], []
     s_min = np.zeros(len(temp_lst), dtype=int)
-    fp_init = [e[j][0] - e_ofs[j] for j in range(cbParam.n_reactors)]
+    fp_init = [e[j][0] - parameters['od_fac']*cbData.od[j][0] - e_ofs[j] for j in range(cbParam.n_reactors)]
     if train:
         low = np.array([3000 if temp_lst[t] < 35 else 0 for t in range(len(temp_lst))])
         high = np.array([8000 if temp_lst[t] < 35 else 1000 for t in range(len(temp_lst))])
@@ -89,18 +89,19 @@ if __name__ == "__main__":
         err = [[] for t in range(len(temp_lst))]
         for j in range(cbParam.n_reactors):
             print("Training at reactor: ", cbParam.titles[j])
-            sim_fp = simulateFlProtein(cbData.time_h[j],fp_init[j], cbData.od[j], cbData.dil[j], cbData.temp_sp[j], parameters, temp_lst, gr_fp, True, e[j] - e_ofs[j], err).T
-            sim_fl_train.append(sim_fp + e_ofs[j])
+            sim_fp = simulateFlProtein(cbData.time_h[j],fp_init[j], cbData.od[j], cbData.dil[j], cbData.temp_sp[j], parameters, temp_lst, gr_fp, True, e[j] - e_ofs[j] - parameters['od_fac']*cbData.od[j], err).T
+            sim_e_train.append(sim_fp + parameters['od_fac']*cbData.od[j] + e_ofs[j])
         
         for t in range(len(temp_lst)):
             rmse = np.sqrt(np.mean(np.array(err[t])**2,axis=0))
             s_min[t] = np.argmin(rmse)
+        sim_fl_opt = [[sim_e_train[j][s_min[temp_lst.index(cbData.temp_sp[j][i])]][i] for i in range(len(cbData.temp_sp[j]))] for j in range(cbParam.n_reactors)]
         # Print obtrained parameters
-        gr_fp_opt = np.array([gr_fp[t][s_min[t]] for t in range(len(temp_lst))])
+        pr_fp_opt = np.array([gr_fp[t][s_min[t]] for t in range(len(temp_lst))])
         print("Brute-Force Production Rates:")
-        print(*gr_fp_opt, sep = ", ")
+        print(*pr_fp_opt, sep = ", ")
 
-        gr_ax.plot(temp_lst, gr_fp_opt, 'o', color = '#0000ff', label = 'Brute-Force')
+        gr_ax.plot(temp_lst, pr_fp_opt, 'o', color = '#0000ff', label = 'Brute-Force')
 
 
     ### Explicit production rate estimation
@@ -122,14 +123,17 @@ if __name__ == "__main__":
             if cbData.temp_sp[j][i] != cbData.temp_sp[j][max(0,i-1)]:
                 gr_constant = False
                 time_beg = cbData.time_h[j][i]
-            if cbData.time_h[j][i] - time_beg > 1 and not gr_constant:
+            if cbData.time_h[j][i] - time_beg > 1.5 and not gr_constant:
                 gr_constant = True
             if cbData.dil[j][i] and not cbData.dil[j][max(0,i-1)]:
+                dfl_list.append(e[j][i] - cbData.od[j][i]*parameters['od_fac'])
+                od_list.append(cbData.od[j][i])
+                time_h_list.append(cbData.time_h[j][i])
                 if diluted and gr_constant: # don't get gradient before first dilution, after temperature change
-                    p_ln_fit = np.polyfit(time_h_list, np.log(od_list), 1, w = np.sqrt(od_list)) # fit exponential, adjusted weight to account for transformation
+                    p_ln_fit = np.polyfit(time_h_list-time_h_list[0], np.log(od_list), 1, w = np.sqrt(od_list)) # fit exponential, adjusted weight to account for transformation
                     mu = p_ln_fit[0]
                     p0 = np.exp(p_ln_fit[1])
-                    dp_list = p0/mu*(np.exp(mu*np.array(time_h_list))-1)# integrate exp
+                    dp_list = p0/mu*(np.exp(mu*np.array(time_h_list-time_h_list[0]))-1)# integrate exp
                     dfl_mat.append(dfl_list)
                     dp_mat.append(np.array(dp_list))
                     temp_sp_list.append(cbData.temp_sp[j][i])
@@ -138,13 +142,13 @@ if __name__ == "__main__":
                 time_h_list = []
                 od_list = []
             if gr_constant and not cbData.dil[j][i]:
-                dfl_list.append(e[j][i])
+                dfl_list.append(e[j][i] - cbData.od[j][i]*parameters['od_fac'])
                 od_list.append(cbData.od[j][i])
                 time_h_list.append(cbData.time_h[j][i])
         # Fit lines and get growth rates
         for r in range(len(temp_sp_list)):
             if len(dfl_mat[r]) > 5:
-                gr.append(np.mean(dfl_mat[r]/dp_mat[r]))
+                gr.append(np.polyfit(dp_mat[r],dfl_mat[r],1)[0])
                 temp_sp.append(temp_sp_list[r])
     # Sort gr according to temperature
     grs = [[] for t in range(len(temp_lst))]
@@ -182,11 +186,11 @@ if __name__ == "__main__":
     gr_fig.savefig(results_dir + "/pr_model_e.png", transparent=True)
 
     parameters['gr_fp'] = gr_model2_all.coefficients
-    sim_fl_test = []
+    sim_e_test = []
     print("Running with estimated parameters")
     for j in range(cbParam.n_reactors):
         sim_fp = simulateFlProtein(cbData.time_h[j], fp_init[j], cbData.od[j], cbData.dil[j], cbData.temp[j], parameters).T
-        sim_fl_test.append(sim_fp + e_ofs[j])
+        sim_e_test.append(sim_fp + e_ofs[j] + parameters['od_fac']*cbData.od[j])
     
     # ANALYSIS
     n_rows = math.ceil(cbParam.n_reactors/2)
@@ -208,14 +212,13 @@ if __name__ == "__main__":
 
         axr.plot(cbData.time_h[j],cbData.temp[j],'r',lw=0.5, alpha = 0.4)
         # ax[r][c].plot(cbData.time_h[j],cbData.od[j],'k',lw = 0.5, alpha = 0.4, label = 'p. putida od')
-        ax[r][c].plot(cbData.time_h[j],e[j],'.g',markersize = 1, label = '$e_{meas}$')
         if train:
-            ax[r][c].plot(cbData.time_h[j],sim_fl_train[j][0],'k',lw = 0.5, label = '$e_{sim, train}$', alpha = 0.1)
-            for s in range(1,min(n_samples,20)):
-                ax[r][c].plot(cbData.time_h[j],sim_fl_train[j][s],'k',lw = 0.5, alpha = 0.1)
-            sim_fl_opt = [sim_fl_train[j][s_min[temp_lst.index(cbData.temp_sp[j][i])]][i] for i in range(len(cbData.temp_sp[j]))]
-            ax[r][c].plot(cbData.time_h[j],sim_fl_opt,'m', lw = 1, label = '$e_{sim, opt}$')
-        ax[r][c].plot(cbData.time_h[j],sim_fl_test[j][0],'b',lw = 1, label = '$e_{sim, model}$')
+            ax[r][c].plot(cbData.time_h[j],sim_e_train[j][0],'k',lw = 0.5, label = '$e_{sim, train}$', alpha = 0.1)
+            for s in range(1,min(n_samples,10)):
+                ax[r][c].plot(cbData.time_h[j],sim_e_train[j][s],'k',lw = 0.5, alpha = 0.1)
+            ax[r][c].plot(cbData.time_h[j],sim_fl_opt[j],'m', lw = 0.5, alpha = 1, label = '$e_{sim, opt}$')
+        ax[r][c].plot(cbData.time_h[j],sim_e_test[j][0],'b',lw = 1, label = '$e_{sim, model}$')
+        ax[r][c].plot(cbData.time_h[j],e[j],'.g',markersize = 1, label = '$e_{meas}$')
 
         # ax[r][c].vlines(cbData.time_h[j][cb_dil[j]==1],-2,2,'g',lw = 0.5, alpha=0.5, label = 'p. putida dil')
         # ax[j].plot(cbData.time_h[j],cbData.od[j]*100,'--m',lw = 0.5, label = 'od')
@@ -231,11 +234,6 @@ if __name__ == "__main__":
         axr.tick_params(axis='y', color='r', labelcolor='r')
         ax[r][c].set_xlim([cbData.time_h[j][0]-0.5,cbData.time_h[j][-1]+0.5])
         # ax[r][c].set_ylim([0,0.5])
-        if train:
-            pass
-            # ax[r][c].set_ylim([0,1.1*max(max(sim_fl_test[j][0]),max(sim_fl_train[j][s_min[j]]))])
-        else:
-            ax[r][c].set_ylim([0,1.1*max(sim_fl_test[j][0])])
         axr.set_ylim([28,37])
         ax[r][c].set_title(cbParam.titles[j])
     # TODO: Set titles

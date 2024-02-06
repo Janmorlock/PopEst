@@ -47,10 +47,8 @@ if __name__ == "__main__":
             temp_sp_mat = []
             time_h_mat = []
             time_h = []
-            # Get dilution times
-            dil = np.diff(cbData.p1[j], prepend=[0,0]) > 0.015
             # Resize data
-            r = 0
+            diluted = False
             od_list = []
             time_h_list = []
             temp_sp_beg = cbData.temp_sp[j][0]
@@ -62,12 +60,14 @@ if __name__ == "__main__":
                     time_beg = cbData.time_h[j][i]
                 if cbData.time_h[j][i] - time_beg > 3 and not gr_constant:
                     gr_constant = True
-                if dil[i]:
-                    if r > 0 and gr_constant: # don't get gradient before first dilution, after temperature change
+                if cbData.dil[j][i] and not cbData.dil[j][max(0,i-1)]:
+                    od_list.append(cbData.od[j][i])
+                    time_h_list.append(cbData.time_h[j][i])
+                    if diluted and gr_constant: # don't get gradient before first dilution, after temperature change
                         od_mat.append(od_list)
                         time_h_mat.append(time_h_list)
                         temp_sp_mat.append(temp_sp_beg)
-                    r += 1
+                    diluted = True
                     od_list = []
                     time_h_list = []
                     temp_sp_beg = cbData.temp_sp[j][i]
@@ -77,8 +77,6 @@ if __name__ == "__main__":
             temps += list(set(temp_sp_mat))
             # Fit lines and get growth rates
             for r in range(len(temp_sp_mat)):
-                time_h_mat[r] = time_h_mat[r][3:]
-                od_mat[r] = od_mat[r][3:]
                 if len(od_mat[r]) > 5:
                     fit = np.poly1d(np.polyfit(time_h_mat[r], np.log(od_mat[r]), 1, w = np.sqrt(od_mat[r])))
                     gr_fit.append(fit)
