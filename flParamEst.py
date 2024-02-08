@@ -101,7 +101,7 @@ if __name__ == "__main__":
         print("Brute-Force Production Rates:")
         print(*pr_fp_opt, sep = ", ")
 
-        gr_ax.plot(temp_lst, pr_fp_opt, 'o', color = '#0000ff', label = 'Brute-Force')
+        gr_ax.plot(temp_lst, pr_fp_opt, 'x', markersize = 7, color = '#0000ff', label = 'Brute-Force')
 
 
     ### Explicit production rate estimation
@@ -123,7 +123,7 @@ if __name__ == "__main__":
             if cbData.temp_sp[j][i] != cbData.temp_sp[j][max(0,i-1)]:
                 gr_constant = False
                 time_beg = cbData.time_h[j][i]
-            if cbData.time_h[j][i] - time_beg > 1.5 and not gr_constant:
+            if cbData.time_h[j][i] - time_beg > 2 and not gr_constant:
                 gr_constant = True
             if cbData.dil[j][i] and not cbData.dil[j][max(0,i-1)]:
                 dfl_list.append(e[j][i] - cbData.od[j][i]*parameters['od_fac'])
@@ -160,13 +160,16 @@ if __name__ == "__main__":
     std = [np.std(grs[t]) for t in range(len(grs))]
     print("Explicit Production Rates:")
     print(*mean, sep = ", ")
-    bp = gr_ax.boxplot(boxdata, positions=temp_lst, widths=0.4, showfliers=False, showmeans=True,
+    bp = gr_ax.boxplot(boxdata, positions=temp_lst, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
                         meanprops=dict(markerfacecolor = '#0000ff', markeredgecolor = '#0000ff'),
                         boxprops=dict(color = '#0000ff'),
                         medianprops=dict(color = '#0000ff'),
                         flierprops=dict(markeredgecolor = '#0000ff'),
                         capprops=dict(color = '#0000ff'),
                         whiskerprops=dict(color = '#0000ff'))
+    # fill with colors
+    for patch in bp['boxes']:
+        patch.set_facecolor((0,0,0,0))
 
     ### Plot both production rate estimates
     gr_model2_all = np.poly1d(np.polyfit(temp_lst[:-1], mean[:-1], 2, w = 1/np.array(std[:-1])))
@@ -174,13 +177,13 @@ if __name__ == "__main__":
     print(*gr_model2_all.coefficients, sep = ", ")
     x_mod = np.linspace(29, 36, 110)
     y_all = np.maximum(gr_model2_all(x_mod),median[-1])
-    gr_ax.plot(x_mod, y_all, '-k', label = '2nd order poly all')
+    gr_ax.plot(x_mod, y_all, '-', color = '#0000FF', label = '2nd order poly fit')
 
     gr_ax.set_xlabel('Temperature [°C]')
     gr_ax.set_ylabel('Production Rate [1/h]')
     h,l = gr_ax.get_legend_handles_labels()
-    h.append(bp["boxes"][0])
-    l.append("Explicit")
+    h = [bp["boxes"][0], *h]
+    l = ["Explicit", *l]
     gr_ax.legend(h,l, loc='best')
     gr_ax.set_title("Fluorescent Protein Production Rate Model")
     gr_fig.savefig(results_dir + "/pr_model_e.png", transparent=True)

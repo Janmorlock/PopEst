@@ -25,6 +25,8 @@ if __name__ == "__main__":
 
     boxdata = [[] for b in range(len(bac))]
 
+    delay = [3, 0]
+
     matplotlib.style.use('default')
     n_rows = math.ceil(cbParam.n_reactors/2)
     n_culumns = 2 if cbParam.n_reactors > 1 else 1
@@ -38,9 +40,8 @@ if __name__ == "__main__":
     
     # for each reactor
     for b in range(len(bac)):
-        counter = 0
-        temp_sp = [[] for j in range(batch_size)]
-        gr = [[] for j in range(batch_size)]
+        temp_sp = []
+        gr = []
         for j in range(bac[b],batch_size+bac[b]):
             gr_fit = []
             od_mat = []
@@ -58,8 +59,6 @@ if __name__ == "__main__":
                 if cbData.temp_sp[j][i] != cbData.temp_sp[j][max(0,i-1)]:
                     gr_constant = False
                     time_beg = cbData.time_h[j][i]
-                if cbData.time_h[j][i] - time_beg > 3 and not gr_constant:
-                    gr_constant = True
                 if cbData.dil[j][i] and not cbData.dil[j][max(0,i-1)]:
                     od_list.append(cbData.od[j][i])
                     time_h_list.append(cbData.time_h[j][i])
@@ -71,7 +70,9 @@ if __name__ == "__main__":
                     od_list = []
                     time_h_list = []
                     temp_sp_beg = cbData.temp_sp[j][i]
-                if gr_constant:
+                    if cbData.time_h[j][i] - time_beg > delay[b]:
+                        gr_constant = True
+                if gr_constant and not cbData.dil[j][i]:
                     od_list.append(cbData.od[j][i])
                     time_h_list.append(cbData.time_h[j][i])
             temps += list(set(temp_sp_mat))
@@ -80,8 +81,8 @@ if __name__ == "__main__":
                 if len(od_mat[r]) > 5:
                     fit = np.poly1d(np.polyfit(time_h_mat[r], np.log(od_mat[r]), 1, w = np.sqrt(od_mat[r])))
                     gr_fit.append(fit)
-                    gr[counter].append(fit.coefficients[0])
-                    temp_sp[counter].append(temp_sp_mat[r])
+                    gr.append(fit.coefficients[0])
+                    temp_sp.append(temp_sp_mat[r])
                     time_h.append(time_h_mat[r])
             
             # Plot gradients
@@ -112,15 +113,12 @@ if __name__ == "__main__":
             axr.set_ylim([28,37])
             ax[r][c].set_title(cbParam.titles[j])
 
-            counter += 1
-
         # Sort gr according to temperature
         temps = list(set(temps))
         temps.sort()
         grs = [[] for t in range(len(temps))]
-        for count in range(batch_size):
-            for r in range(len(temp_sp[count])):
-                grs[temps.index(temp_sp[count][r])].append(gr[count][r])
+        for r in range(len(temp_sp)):
+            grs[temps.index(temp_sp[r])].append(gr[r])
 
         boxdata[b] = grs
         mean[b] = [np.mean(grs[t]) for t in range(len(grs))]
@@ -139,27 +137,37 @@ if __name__ == "__main__":
     fig_gr.set_figheight(6)
     fig_gr.set_figwidth(8)
     # Plot gradients
-    ax.boxplot(boxdata[0], positions=temps, widths=0.4, showfliers=False,
-               boxprops=dict(color="g", alpha=0.5),
-               medianprops=dict(color="g", alpha=0.5),
-               flierprops=dict(markeredgecolor="g", alpha=0.5),
-               capprops=dict(color="g", alpha=0.5),
-               whiskerprops=dict(color="g", alpha=0.5))
-    ax.boxplot(boxdata[1], positions=temps, widths=0.4, showfliers=False,
-               boxprops=dict(color="m", alpha=0.5),
-               medianprops=dict(color="m", alpha=0.5),
-               flierprops=dict(markeredgecolor="m", alpha=0.5),
-               capprops=dict(color="m", alpha=0.5),
-               whiskerprops=dict(color="m", alpha=0.5))
+    bp_p = ax.boxplot(boxdata[0], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
+                meanprops=dict(markerfacecolor = 'g', markeredgecolor = 'g'),
+                boxprops=dict(color="g", alpha=0.5),
+                medianprops=dict(color="g", alpha=0.5),
+                flierprops=dict(markeredgecolor="g", alpha=0.5),
+                capprops=dict(color="g", alpha=0.5),
+                whiskerprops=dict(color="g", alpha=0.5))
+    bp_e = ax.boxplot(boxdata[1], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
+                meanprops=dict(markerfacecolor = 'm', markeredgecolor = 'm'),
+                boxprops=dict(color="m", alpha=0.5),
+                medianprops=dict(color="m", alpha=0.5),
+                flierprops=dict(markeredgecolor="m", alpha=0.5),
+                capprops=dict(color="m", alpha=0.5),
+                whiskerprops=dict(color="m", alpha=0.5))
+    # fill with colors
+    for bp in [bp_p, bp_e]:
+        for patch in bp['boxes']:
+            patch.set_facecolor((1,1,1,0))
+
     # Plot fit
     x = np.linspace(temps[0],temps[-1],100)
-    ax.plot(x, p_model(x), 'g', linewidth=2, label = 'P. putida (ivw fit)')
-    ax.plot(x, e_model(x), 'm', linewidth=2, label = 'E. coli (ivw fit)')
+    ax.plot(x, p_model(x), 'g', linewidth=2, label = 'ivw fit')
+    ax.plot(x, e_model(x), 'm', linewidth=2, label = 'ivw fit')
     ax.set_xlabel(r'Temperature $[^{\circ}C]$')
     ax.set_ylabel(r'Growth rate $[\frac{1}{h}]$')
-    ax.legend(loc='best')
+    h,l = ax.get_legend_handles_labels()
+    h = [bp_p["boxes"][0], bp_e["boxes"][0], *h]
+    l = ['P. putida', 'E. coli', *l]
+    ax.legend(h,l, loc='best')
     ax.set_title("Bacteria Growth Rates")
-    ax.set_ylim([0,1.5])
+    ax.set_ylim([0,1.4])
 
     # Save figures
     fig.suptitle(dataName)

@@ -92,6 +92,33 @@ class CbDataParam:
                 # Sampcycle indices as in Matlab
                 sampcycle = np.array([[0,1800] for i in range(n_reactors)])
                 titles = ['C8M0','C8M1','C6M0','C6M1']
+            case '069-2':
+                path = '../../Ting/Experiments/069-2'
+                # Indeces of files of interest
+                file_ind = [0,1,2,3,8,9,10,11,4,5,6,7]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1800] for i in range(n_reactors)])
+                titles = ['C7M0','C7M1','C7M2','C7M3','C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3']
+                reactors = ['Faith', 'Alabama', 'George', 'Tammy', 'Taylor', 'Garth', 'Willi', 'Reba', 'Shania', 'Johnny', 'Dolly', 'Carrie']
+            case '069-3':
+                path = '../../Ting/Experiments/069-3'
+                # Indeces of files of interest
+                file_ind = [0,1,2,3]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1800] for i in range(n_reactors)])
+                titles = ['C6M0','C6M1','C6M2','C6M3']
+                reactors = ['Allan', 'Arthur', 'Morlock', 'Swift']
+            case '073-1':
+                path = '../../Ting/Experiments/073-1'
+                # Indeces of files of interest
+                file_ind = [0,1,2,3,4]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = np.array([[0,1800] for i in range(n_reactors)])
+                titles = ['C6M0','C6M1','C6M2','C6M3','C6M4']
+                reactors = ['Allan', 'Arthur', 'Morlock', 'Swift', 'Stacey']
             case '074-1':
                 path = '../../Ting/Experiments/074-1'
                 # Indeces of files of interest
@@ -110,7 +137,7 @@ class CbDataParam:
                 sampcycle[12:15] = np.array([[0,1000] for i in range(3)])
                 sampcycle[1] = np.array([0,800])
                 titles = ['C7M0','C7M1','C7M2','C7M3','C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3','C6M0','C6M1','C6M2','C6M3']
-                reactors = ['Faith', 'Alabama', 'Arthur', 'Allan', 'Morlock', 'Swift', 'Stacey', 'George', 'Tammy', 'Taylor', 'Garth', 'Willi', 'Reba', 'Shania', 'Johnny', 'Dolly', 'Carrie', 'Allan', 'Arthur', 'Morlock', 'Swift']
+                reactors = ['Faith', 'Alabama', 'George', 'Tammy', 'Taylor', 'Garth', 'Willi', 'Reba', 'Shania', 'Johnny', 'Dolly', 'Carrie', 'Allan', 'Arthur', 'Morlock', 'Swift']
             case '076-1':
                 path = '../../Ting/Experiments/076-1'
                 # Indeces of files of interest
