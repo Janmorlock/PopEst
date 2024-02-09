@@ -42,7 +42,6 @@ class EKF:
         self.r_ind = r_ind
         self.update = update
         self.time_prev = 0.0
-        self.temp_prev = 0.0
 
         self.est = {  # Initial state
             'e': model.parameters['od_init']*model.parameters['e_rel_init'],
@@ -51,7 +50,7 @@ class EKF:
         }
         self.var = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
 
-    def estimate(self, time: float, u: float, y: np.ndarray = np.zeros(0)):
+    def estimate(self, time: float, u: np.ndarray, y: np.ndarray = np.zeros(0)):
         """
         Update system state and variance estimate by performing prediction and measurement update step with the Extended Kalman Filter.
 
@@ -59,8 +58,8 @@ class EKF:
         ----------
         time : float
             The time in s at which the measurement is obtained.
-        u : float
-            The input u = temp_prev to the system.
+        u : np.ndarray, dim: (num_inputs,)
+            The input u = [temp_prev, dilute] to the system.
         y : np.ndarray, dim: (num_outputs,), optional
             The measurement of the system. The order of outputs is given by y = [fl, od].
             Will be ignored when update set to False.
@@ -70,12 +69,11 @@ class EKF:
         None
         """
         # Prediction
-        if self.temp_prev != 0: # Skip on first time step
+        if self.time_prev != 0: # Skip on first time step
             dt = time - self.time_prev
-            self.est, self.var = self.model.predict(self.r_ind, self.est, self.var, self.temp_prev, dt)
+            self.est, self.var = self.model.predict(self.r_ind, self.est, self.var, u, dt)
 
         self.time_prev = time
-        self.temp_prev = u
 
         # MeasurementUpdate
         if self.update:

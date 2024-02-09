@@ -5,92 +5,119 @@ from config.params import Params
 
 # initialize
 class CustModel:
-    def __init__(self, n_reactors: int):
+    def __init__(self, dithered: bool = True, n_reactors: int = 1):
         self.parameters = Params().default
+        self.dithered = dithered
 
-        self.parameters['lag_ind'] = int(self.parameters['lag']*3600/self.parameters['ts']) # Lag indeces
-        self.parameters['r'] = np.diag([self.parameters['sigma_od']**2, self.parameters['sigma_fl']**2])
-        self.parameters['q'] = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
-        self.parameters['q_dil'] = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
-
-        temps = np.full((self.parameters['lag_ind']+1,2),[self.parameters['temp_pre_e'],self.parameters['temp_pre_p']],dtype='float').T
-        self.temps = np.full((n_reactors,temps.shape[0],temps.shape[1]),temps)
+        self.temps = np.full((n_reactors,3),[self.parameters['temp_pre_e'],self.parameters['temp_pre_p'],self.parameters['temp_pre_p']],dtype='float')
+        self.lp_fac = np.exp(-self.parameters['ts']/np.array(self.parameters['lp_ht']))
         self.ts = self.parameters['ts']
         self.ts_h = self.ts/3600
 
-        self.A_dil = np.eye(3)
+        self.Q = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
+        self.Q_dil = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
+        self.Q_dil_dit = np.diag([self.parameters['sigma_e_dil_dit']**2, self.parameters['sigma_p_dil_dit']**2, self.parameters['sigma_fp_dil_dit']**2])
+
+        self.L = np.eye(3)
         self.L_dil = np.eye(3)
 
-        self.A = np.eye(3)
-        self.L = np.eye(3)
+        self.R = np.diag([self.parameters['sigma_od']**2, self.parameters['sigma_fl']**2])
 
         self.H = np.zeros((2,3))
         self.M = np.eye(2)
 
-
     def dilute(self, x_prev: np.ndarray, p_prev: np.ndarray):
+        '''
+        Continuous Dilution
+
+        Similar to the chiBio, this model checks every iteration if dilution is required.
+        '''
         x_dil = x_prev.copy()
         p_dil = p_prev.copy()
-        # Dilution, checked at same rate as real system TODO: add dithered dilution
+
+        # Dilution
         if x_prev[0] + x_prev[1] > self.parameters['od_setpoint']:
             if x_prev[0] + x_prev[1] < 1.1*self.parameters['od_setpoint']:
                 x_dil *= (2*self.parameters['od_setpoint']/(x_prev[0] + x_prev[1]) - 1)
             else: # Prevent too extensive bounce back from high od values
                 print('diluting differently')
                 x_dil *= self.parameters['od_setpoint']/(x_prev[0] + x_prev[1])
-            # Jacobian of dilution
             den = (x_prev[0] + x_prev[1])**2
-            self.A_dil = np.array([[x_prev[1]/den-1, -x_prev[0]/den, 0],
+            # Covariance estimation after dilution
+            A_dil = np.array([[x_prev[1]/den-1, -x_prev[0]/den, 0],
                                     [-x_prev[1]/den, x_prev[0]/den-1, 0],
                                     [-x_prev[2]/den, -x_prev[2]/den, 1/(x_prev[0]+x_prev[1]) - 1]])
-            p_dil = self.A_dil @ p_prev @ self.A_dil.T + self.L_dil @ self.parameters['q_dil'] @ self.L_dil.T
+            p_dil = A_dil @ p_prev @ A_dil.T + self.L_dil @ self.Q_dil @ self.L_dil.T
         return x_dil, p_dil
 
+    def dilute_dithered(self, x_prev: np.ndarray, p_prev: np.ndarray):
+        '''
+        Dithered Dilution
 
-    def predict(self, r_ind, x_prev_dic: dict, p_prev: np.ndarray, u: float, dt: float) -> Tuple[dict, np.ndarray]:
+        This model tries to dilute the same amount as the chiBio during dithered dilution.
+        '''
+        dil_r = self.parameters['dil_rate']
+        od = x_prev[0] + x_prev[1]
+        # Dilution
+        x_dil = x_prev * (1 - dil_r/od)
+        # Covariance estimation after dilution
+        A_dil = np.array([[1 - dil_r*x_prev[1]/od**2, dil_r*x_prev[0]/od**2, 0],
+                            [dil_r*x_prev[1]/od**2, 1 - dil_r*x_prev[0]/od**2, 0],
+                            [dil_r*x_prev[2]/od**2, dil_r*x_prev[2]/od**2, 1 - dil_r/od]])
+        p_dil = A_dil @ p_prev @ A_dil.T + self.L_dil @ self.Q_dil_dit @ self.L_dil.T
+        return x_dil, p_dil
+    
+    def predict(self, r_ind, x_prev_dic: dict, p_prev: np.ndarray, u: np.ndarray, dt: float) -> Tuple[dict, np.ndarray]:
         """
-        Dilutes if needed and predicts states their variance after dt seconds.
+        Prediction Step
+
+        Dilutes if needed and predicts states and their variance after dt seconds.
+        To calculate the variance, the Jacobian of the system model is used.
         """ 
         x_prev = np.fromiter(x_prev_dic.values(),dtype=float)
-        x_pred, p_pred = self.dilute(x_prev, p_prev)
+        x_pred = x_prev.copy()
+        p_pred = p_prev.copy()
+
+        # Dilute if needed
+        if self.dithered:
+            if u[1]:
+                x_pred, p_pred = self.dilute_dithered(x_prev, p_prev)
+        else:
+            x_pred, p_pred = self.dilute(x_prev, p_prev)
 
         # Approximate abundance and their varaince after dt seconds of growth
-        temp = np.full(3,u,dtype='float')
+        temp = np.full(3,u[0],dtype='float')
         for i in range(round(dt/self.ts)):
-            # Modifiy temperature
-            self.temps[r_ind] = np.append(self.temps[r_ind,:,1:],np.full((2,1),u),axis=1)
-            if self.parameters['avg_temp']:
-                temp[0:2] = np.average(self.temps[r_ind], axis=1)
-            else:
-                temp[0:2] = self.temps[:,0]
-            # Jacobian of growth
-            self.A = np.array([[1 + self.ts_h*self.getGrowthRates(temp)[0], 0, 0],
-                      [0, 1 + self.ts_h*self.getGrowthRates(temp)[1], 0],
-                      [0, self.ts_h*self.getGrowthRates(temp)[2], 1]])
+            # Get delayed temperature values
+            self.temps[r_ind] = self.lp_fac*self.temps[r_ind] + (1-self.lp_fac)*temp
+            # Get growth rates
+            gr = self.getGrowthRates(self.temps[r_ind])
+            # Jacobian of growth model
+            A = np.array([[1 + self.ts_h*gr[0], 0, 0],
+                      [0, 1 + self.ts_h*gr[1], 0],
+                      [0, self.ts_h*gr[2], 1]])
             self.L = np.diag([self.ts_h*x_pred[0], self.ts_h*x_pred[1], self.ts_h*x_pred[1]])
 
             # Abundance after Ts seconds
             # Euler forward (not significantly less accurate than Runge - Kutta 4th order)
-            x_pred = x_pred + self.ts_h*self.getGrowthRates(temp)*np.array([x_pred[0], x_pred[1], x_pred[1]])
+            x_pred = x_pred + self.ts_h*gr*np.array([x_pred[0], x_pred[1], x_pred[1]])
 
-            # Runge - Kutta 4th order
-            # k1 = self.getGrowthRates(temp)*np.array([x_pred[0], x_pred[1], x_pred[1]])
-            # k2 = self.getGrowthRates(temp)*np.array([x_pred[0]+self.ts_h/2*k1[0], x_pred[1]+self.ts_h/2*k1[1], x_pred[1]+self.ts_h/2*k1[1]])
-            # k3 = self.getGrowthRates(temp)*np.array([x_pred[0]+self.ts_h/2*k2[0], x_pred[1]+self.ts_h/2*k2[1], x_pred[1]+self.ts_h/2*k2[1]])
-            # k4 = self.getGrowthRates(temp)*np.array([x_pred[0]+self.ts_h*k3[0], x_pred[1]+self.ts_h*k3[1], x_pred[1]+self.ts_h*k3[1]])
-            # x_pred = x_pred + self.ts_h/6*(k1+2*k2+2*k3+k4)
-
-            p_pred = self.A @ p_pred @ self.A.T + self.L @ self.parameters['q'] @ self.L.T
+            p_pred = A @ p_pred @ A.T + self.L @ self.Q @ self.L.T
 
         return dict(zip(x_prev_dic, x_pred)), p_pred
     
     def update(self, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray) -> Tuple[dict, np.ndarray]:
+        '''
+        Update Step
+        
+        Updates the states and their variance after a measurement y.
+        '''
         x_pred = np.fromiter(x_pred_dic.values(),dtype=float)
         od = x_pred[0] + x_pred[1]
         self.H = np.array([[1, 1, 0],
                            [self.parameters['od_fac'], self.parameters['od_fac'], 1]]) # [-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])]
         # K = np.linalg.solve(self.H @ p_pred.T @ self.H.T + self.M @ self.parameters['r'].T @ self.M.T, self.H @ p_pred.T).T
-        K = p_pred @ self.H.T @ np.linalg.inv(self.H @ p_pred @ self.H.T + self.M @ self.parameters['r'] @ self.M.T)
+        K = p_pred @ self.H.T @ np.linalg.inv(self.H @ p_pred @ self.H.T + self.M @ self.R @ self.M.T)
         y_est = np.array([od, x_pred[2] + self.parameters['od_fac']*od + self.parameters['e1_ofs']]) # x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind]
         xm = x_pred + K @ (y - y_est)
         xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
@@ -115,6 +142,6 @@ class CustModel:
         gr_e = self.parameters['gr_e'][0]*temp[0] + self.parameters['gr_e'][1]
         gr_p = self.parameters['gr_p'][0]*temp[1]**2 + self.parameters['gr_p'][1]*temp[1] + self.parameters['gr_p'][2]
         gr_f = self.parameters['gr_fp'][0]*temp[2]**2 + self.parameters['gr_fp'][1]*temp[2] + self.parameters['gr_fp'][2]
-        gr_f = max(0,gr_f)
+        gr_f = max(100,gr_f)
 
         return np.array([gr_e, gr_p, gr_f])

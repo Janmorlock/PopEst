@@ -49,8 +49,8 @@ if __name__ == "__main__":
             u_pred = cbData.temp[j][k]
             est_pred.estimate(cbData.time[j][k], u_pred)
             estimates_pred[j].append(est_pred.est)
-
-            u = cbData.temp[j][k]
+            dil = cbData.dil[j][k] if cbData.dil else 0
+            u = np.array([cbData.temp[j][k], dil])
             y = np.array([cbData.od[j][k], cbData.fl[j][k]*cbData.b1[j][k]])
             est.estimate(cbData.time[j][k], u, y)
             estimates[j].append(est.est)

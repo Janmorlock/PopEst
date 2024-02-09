@@ -7,12 +7,12 @@ class Params:
             'temp_pre_p' : 26,
 
             'od_setpoint' : 0.5,
+            'dil_rate' : 0.048, # 1/cycle
 
             'ts' : 1, # seconds
 
             'avg_temp' : True,
-            'lag' : 3, # hours
-            'lag_ind' : 0, # Lag indeces
+            'lp_ht' : [1/60,1,1/60], # IIR Filter halftime in h for temperature delay of [e,p,fp] production
             'min_fl' : [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061],
             'max_fl' : [0.280, 0.408, 0.355, 0.375, 0.323, 0.391, 0.297, 0.310],
             # 'fl_ofs' : [0.06681171028640953, 0.10124284006186575, 0.012420329020951698, 0.09948044745557398, 0.08938092574497708, 0.11260643351414071, 0.05869055434532918, 0.048870744085821975],
@@ -46,14 +46,16 @@ class Params:
             'sigma_e_dil' : 1e-2,
             'sigma_p_dil' : 1e-2,
             'sigma_fp_dil' : 1e2,
-            'q_dil' : np.zeros((3,3)),
+
+            'sigma_e_dil_dit' : 1e-2,
+            'sigma_p_dil_dit' : 1e-2,
+            'sigma_fp_dil_dit' : 1e2,
+
             'sigma_e' : 1e-4,
             'sigma_p' : 1e-4,
             'sigma_fp' : 5e5,
-            'q' : np.zeros((3,3)),
 
             # Measurement noise standard deviation
             'sigma_od' : 5e-2,
             'sigma_fl' : 1e1,
-            'r' : np.zeros((2,2))
         }
