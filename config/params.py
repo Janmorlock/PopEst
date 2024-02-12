@@ -58,4 +58,6 @@ class Params:
             # Measurement noise standard deviation
             'sigma_od' : 5e-2,
             'sigma_fl' : 1e1,
+            'sigma_od_gr' : 1e2,
+            'sigma_fl_gr' : 1e2,
         }

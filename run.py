@@ -29,10 +29,6 @@ if __name__ == "__main__":
     cbParam = CbDataParam(data_name)
     cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
 
-    # Initialize the model
-    model_pred = CustModel(cbParam.n_reactors)
-    model = CustModel(cbParam.n_reactors)
-
     critTemp = getCritTemp()[0]
     assert(26 < critTemp and critTemp < 37)
 
@@ -42,8 +38,9 @@ if __name__ == "__main__":
     variances = [[] for j in range(cbParam.n_reactors)]
     for j in range(cbParam.n_reactors):
         # Construct State estimator
-        est_pred = EKF(model_pred, j, update = False)
-        est = EKF(model, j)
+        est_pred = EKF(dev_ind = j, update = False)
+        est = EKF(dev_ind = j)
+        est.initialise('Faith')
         for k in range(len(cbData.time[j])):
             # Run the filter
             u_pred = cbData.temp[j][k]

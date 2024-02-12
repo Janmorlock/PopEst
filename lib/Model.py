@@ -5,11 +5,11 @@ from config.params import Params
 
 # initialize
 class CustModel:
-    def __init__(self, dithered: bool = True, n_reactors: int = 1):
+    def __init__(self):
         self.parameters = Params().default
-        self.dithered = dithered
+        self.dithered = False
 
-        self.temps = np.full((n_reactors,3),[self.parameters['temp_pre_e'],self.parameters['temp_pre_p'],self.parameters['temp_pre_p']],dtype='float')
+        self.temps = np.array([self.parameters['temp_pre_e'],self.parameters['temp_pre_p'],self.parameters['temp_pre_p']],dtype='float')
         self.lp_fac = np.exp(-self.parameters['ts']/np.array(self.parameters['lp_ht']))
         self.ts = self.parameters['ts']
         self.ts_h = self.ts/3600
@@ -17,14 +17,11 @@ class CustModel:
         self.Q = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
         self.Q_dil = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
         self.Q_dil_dit = np.diag([self.parameters['sigma_e_dil_dit']**2, self.parameters['sigma_p_dil_dit']**2, self.parameters['sigma_fp_dil_dit']**2])
-
         self.L = np.eye(3)
         self.L_dil = np.eye(3)
 
-        self.R = np.diag([self.parameters['sigma_od']**2, self.parameters['sigma_fl']**2])
-
-        self.H = np.zeros((2,3))
-        self.M = np.eye(2)
+        self.R = np.diag([self.parameters['sigma_od']**2, self.parameters['sigma_fl']**2, self.parameters['sigma_od_gr']**2, self.parameters['sigma_fl_gr']**2])
+        self.M = np.eye(4)
 
     def dilute(self, x_prev: np.ndarray, p_prev: np.ndarray):
         '''
@@ -67,7 +64,7 @@ class CustModel:
         p_dil = A_dil @ p_prev @ A_dil.T + self.L_dil @ self.Q_dil_dit @ self.L_dil.T
         return x_dil, p_dil
     
-    def predict(self, r_ind, x_prev_dic: dict, p_prev: np.ndarray, u: np.ndarray, dt: float) -> Tuple[dict, np.ndarray]:
+    def predict(self, x_prev_dic: dict, p_prev: np.ndarray, u: np.ndarray, dt: float) -> Tuple[dict, np.ndarray]:
         """
         Prediction Step
 
@@ -89,9 +86,9 @@ class CustModel:
         temp = np.full(3,u[0],dtype='float')
         for i in range(round(dt/self.ts)):
             # Get delayed temperature values
-            self.temps[r_ind] = self.lp_fac*self.temps[r_ind] + (1-self.lp_fac)*temp
+            self.temps = self.lp_fac*self.temps + (1-self.lp_fac)*temp
             # Get growth rates
-            gr = self.getGrowthRates(self.temps[r_ind])
+            gr = self.getGrowthRates(self.temps)
             # Jacobian of growth model
             A = np.array([[1 + self.ts_h*gr[0], 0, 0],
                       [0, 1 + self.ts_h*gr[1], 0],
@@ -106,7 +103,7 @@ class CustModel:
 
         return dict(zip(x_prev_dic, x_pred)), p_pred
     
-    def update(self, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray) -> Tuple[dict, np.ndarray]:
+    def update(self, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray, p_est_od: float, p_est_fl: float) -> Tuple[dict, np.ndarray]:
         '''
         Update Step
         
@@ -114,14 +111,28 @@ class CustModel:
         '''
         x_pred = np.fromiter(x_pred_dic.values(),dtype=float)
         od = x_pred[0] + x_pred[1]
-        self.H = np.array([[1, 1, 0],
-                           [self.parameters['od_fac'], self.parameters['od_fac'], 1]]) # [-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])]
-        # K = np.linalg.solve(self.H @ p_pred.T @ self.H.T + self.M @ self.parameters['r'].T @ self.M.T, self.H @ p_pred.T).T
-        K = p_pred @ self.H.T @ np.linalg.inv(self.H @ p_pred @ self.H.T + self.M @ self.R @ self.M.T)
-        y_est = np.array([od, x_pred[2] + self.parameters['od_fac']*od + self.parameters['e1_ofs']]) # x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind]
+
+        H = np.array([[self.parameters['od_fac'], self.parameters['od_fac'], 1]]) # [-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])]
+        y_est = x_pred[2] + self.parameters['od_fac']*od # x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind]
+        m = 1
+        if y[0]:
+            H = np.append([1, 1, 0], H)
+            y_est = np.array([od, y_est])
+            m += 1
+        if p_est_od:
+            H = np.append(H, [0, 1, 0])
+            y_est = np.append(y_est, x_pred[1])
+            m += 1
+        if p_est_fl:
+            H = np.append(H, [0, 1, 0])
+            y_est = np.append(y_est, x_pred[1])
+            m += 1
+        
+        # K = np.linalg.solve(H @ p_pred.T @ H.T + self.M @ self.parameters['r'].T @ self.M.T, H @ p_pred.T).T
+        K = p_pred @ H.T @ np.linalg.inv(H @ p_pred @ H.T + self.M[:m,:m] @ self.R[:m,:m] @ self.M[:m,:m].T)
         xm = x_pred + K @ (y - y_est)
         xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
-        Pm = (np.eye(3) - K @ self.H) @ p_pred
+        Pm = (np.eye(3) - K @ H) @ p_pred
 
         # Constrain states to be positive
         if xm[0] < 0:
