@@ -8,18 +8,27 @@ import os
 from paramsData import CbDataParam
 from CbData import CbData
 from lib.Estimator import EKF
+from config.params import Params
 from lib.Model import CustModel
 
-def f(xy, model = CustModel(1)):
-    x, y = xy
-    gr = model.getGrowthRates(np.full(3,x))
-    z = np.array([y - gr[0],
-                  y - gr[1]])
-    return z
 
-def getCritTemp():
-    temp = fsolve(f, [33.0, 0.8])
-    return temp
+class CritTemp:
+    def __init__(self, gr_e = np.zeros(1), gr_p = np.zeros(1)):
+        self.model = CustModel()
+        if gr_e[0]:
+            self.model.parameters['gr_e'] = gr_e
+            self.model.parameters['gr_p'] = gr_p
+
+    def f(self, xy):
+        x, y = xy
+        gr = self.model.getGrowthRates(np.full(3,x))
+        z = np.array([y - gr[0],
+                    y - gr[1]])
+        return z
+
+    def getCritTemp(self):
+        temp = fsolve(self.f, [33.0, 0.8])
+        return temp[0]
 
 
 if __name__ == "__main__":
@@ -29,7 +38,10 @@ if __name__ == "__main__":
     cbParam = CbDataParam(data_name)
     cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
 
-    critTemp = getCritTemp()[0]
+    parameters = Params().default
+
+    cT = CritTemp()
+    critTemp = cT.getCritTemp()
     assert(26 < critTemp and critTemp < 37)
 
     # dim = reactor, time, state
@@ -40,7 +52,7 @@ if __name__ == "__main__":
         # Construct State estimator
         est_pred = EKF(dev_ind = j, update = False)
         est = EKF(dev_ind = j)
-        est.initialise('Faith')
+        est.set_r_coeff('Faith')
         for k in range(len(cbData.time[j])):
             # Run the filter
             u_pred = cbData.temp[j][k]
@@ -99,17 +111,17 @@ if __name__ == "__main__":
         axr.hlines(critTemp,cbData.time_h[j][0]-1,cbData.time_h[j][-1]+1,'r',lw=0.5,alpha=0.5)
 
         ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],100-cbParam.cb_fc_ec[j], 'gx', markersize = 10, label = '$puti_{fc}$')
-        ax[r][c].plot(cbData.time_h[j],(cbData.fl[j]-model.parameters['min_fl'][j])/(model.parameters['max_fl'][j]-model.parameters['min_fl'][j])*100,'.g',markersize = 0.8, alpha = 0.5, label = '$puti_{est,old}$')
+        ax[r][c].plot(cbData.time_h[j],(cbData.fl[j]-parameters['min_fl'][j])/(parameters['max_fl'][j]-parameters['min_fl'][j])*100,'.g',markersize = 0.8, alpha = 0.5, label = '$puti_{est,old}$')
         ax[r][c].plot(cbData.time_h[j],p_puti_pred_percent, '--g', lw = 0.8, label = '$puti_{pred}$')
         ax[r][c].plot(cbData.time_h[j],p_puti_percent, 'g', lw = 1.2, label = '$puti_{est}$')
 
         # ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*100,'.m',markersize = 0.8,label = '$fl_{meas}*100$')
-        # ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}*100$')
-        # ax[r][c].plot(cbData.time_h[j],(fp/(od+model.parameters['od_ofs']) + model.parameters['fl_ofs'][j])*100,color = '#0000ff',lw = 1.2, label = '$fl_{est}*100$')
+        # ax[r][c].plot(cbData.time_h[j],(fp_pred/(od_pred+parameters['od_ofs']) + parameters['fl_ofs'][j])*100,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}*100$')
+        # ax[r][c].plot(cbData.time_h[j],(fp/(od+parameters['od_ofs']) + parameters['fl_ofs'][j])*100,color = '#0000ff',lw = 1.2, label = '$fl_{est}*100$')
 
         ax[r][c].plot(cbData.time_h[j],cbData.fl[j]*cbData.b1[j]/max_fl,'.m',markersize = 0.8,label = '$fl_{meas}$')
-        ax[r][c].plot(cbData.time_h[j],(fp_pred + model.parameters['od_fac']*od_pred + model.parameters['e1_ofs'])/max_fl,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}$')
-        ax[r][c].plot(cbData.time_h[j],(fp + model.parameters['od_fac']*od + model.parameters['e1_ofs'])/max_fl,color = '#0000ff',lw = 1.2, label = '$fl_{est}$')
+        ax[r][c].plot(cbData.time_h[j],(fp_pred + parameters['od_fac']*od_pred + parameters['e1_ofs'])/max_fl,'--',color='#0000ff',lw = 0.8, label = '$fl_{pred}$')
+        ax[r][c].plot(cbData.time_h[j],(fp + parameters['od_fac']*od + parameters['e1_ofs'])/max_fl,color = '#0000ff',lw = 1.2, label = '$fl_{est}$')
 
         ax[r][c].plot(cbData.time_h[j],cbData.od[j]*100,'.k',markersize = 0.8, alpha = 0.5, label = '$od_{meas}*100$')
         ax[r][c].plot(cbData.time_h[j],od*100,'k',lw = 0.5, alpha = 1, label = '$od_{est}*100$')
@@ -144,4 +156,4 @@ if __name__ == "__main__":
     results_dir = "Images/{}".format(data_name)
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir+"/ekf_{}r_{}h{}lag_e1.png".format(cbParam.n_reactors,model.parameters['lag'],'avg' if model.parameters['avg_temp'] else ''),transparent=True)
+    fig.savefig(results_dir+"/ekf_{}r_e.png".format(cbParam.n_reactors),transparent=True)

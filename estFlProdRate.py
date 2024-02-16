@@ -174,7 +174,8 @@ if __name__ == "__main__":
     ### Plot both production rate estimates
     gr_model2_all = np.poly1d(np.polyfit(temp_lst[:-1], mean[:-1], 2, w = 1/np.array(std[:-1])))
     print("Production rate model:")
-    print(*gr_model2_all.coefficients, sep = ", ")
+    model_coeff = np.round(gr_model2_all.coefficients, 5)
+    print(*model_coeff, sep = ", ")
     x_mod = np.linspace(29, 36, 110)
     y_all = np.maximum(gr_model2_all(x_mod),median[-1])
     gr_ax.plot(x_mod, y_all, '-', color = '#0000FF', label = '2nd order poly fit')
@@ -188,7 +189,7 @@ if __name__ == "__main__":
     gr_ax.set_title("Fluorescent Protein Production Rate Model")
     gr_fig.savefig(results_dir + "/pr_model_e.png", transparent=True)
 
-    parameters['gr_fp'] = gr_model2_all.coefficients
+    parameters['gr_fp'] = model_coeff
     sim_e_test = []
     print("Running with estimated parameters")
     for j in range(cbParam.n_reactors):

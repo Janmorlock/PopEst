@@ -1,4 +1,5 @@
 
+from logging import critical
 from turtle import back
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,6 +9,7 @@ import os
 
 from CbData import CbData
 from paramsData import CbDataParam
+from runWithData import CritTemp
 
 if __name__ == "__main__":
 
@@ -133,6 +135,9 @@ if __name__ == "__main__":
     print(*p_coefficients, sep = ", ")
     print("E. coli growth rate fit:")
     print(*e_coefficients, sep = ", ")
+    cT = CritTemp(e_coefficients, p_coefficients)
+    critical_temp = round(cT.getCritTemp(),2)
+    print("Critical temperature: ", critical_temp)
     fig_gr, ax = plt.subplots()
     fig_gr.set_figheight(6)
     fig_gr.set_figwidth(8)
@@ -160,7 +165,11 @@ if __name__ == "__main__":
     x = np.linspace(temps[0],temps[-1],100)
     ax.plot(x, p_model(x), 'g', linewidth=2, label = 'ivw fit')
     ax.plot(x, e_model(x), 'm', linewidth=2, label = 'ivw fit')
-    ax.set_xlabel(r'Temperature $[^{\circ}C]$')
+    ax.vlines(critical_temp, 0, 1.4, lw = 1, colors='k', linestyles='dashed')
+    # xticks = list(set(np.round(ax.get_xticks(),0))) + [critical_temp]
+    # xticks.sort()
+    # ax.set_xticks(xticks)
+    # ax.set_xlabel(r'Temperature $[^{\circ}C]$')
     ax.set_ylabel(r'Growth rate $[\frac{1}{h}]$')
     h,l = ax.get_legend_handles_labels()
     h = [bp_p["boxes"][0], bp_e["boxes"][0], *h]

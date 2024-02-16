@@ -53,7 +53,10 @@ class EKF:
         self.temp_lst = []
         self.od_lst = []
         self.fl_lst = []
-        self.dil_prev = False
+        self.u_prev = np.array([23, False])
+
+        self.p_est_fl = 0
+        self.p_est_od = 0
 
         self.est = {  # Initial state
             'e': model.parameters['od_init']*model.parameters['e_rel_init'],
@@ -62,11 +65,11 @@ class EKF:
         }
         self.var = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
 
-    def initialise(self, m0_key):
+    def set_r_coeff(self, m0_key):
         e_ofs_lst = list(self.model.parameters['e_ofs'].values())
         e_fac_lst = list(self.model.parameters['e_fac'].values())
-        self.e_ofs = e_ofs_lst[self.model.parameters['e_ofs'].index(m0_key) + self.dev_ind]
-        self.e_fac = e_fac_lst[self.model.parameters['e_fac'].index(m0_key) + self.dev_ind]
+        self.e_ofs = e_ofs_lst[list(self.model.parameters['e_ofs'].keys()).index(m0_key) + self.dev_ind]
+        self.e_fac = e_fac_lst[list(self.model.parameters['e_fac'].keys()).index(m0_key) + self.dev_ind]
 
     def estimate(self, time: float, u: np.ndarray, y: np.ndarray = np.zeros(0)):
         """
@@ -77,7 +80,7 @@ class EKF:
         time : float
             The time in s at which the measurement is obtained.
         u : np.ndarray, dim: (num_inputs,)
-            The input u = [temp_prev, dilute] to the system.
+            The next input u = [temp, dilute] to the system.
         y : np.ndarray, dim: (num_outputs,), optional
             The measurement of the system. The order of outputs is given by y = [fl, od].
             Will be ignored when update set to False.
@@ -90,32 +93,37 @@ class EKF:
         # Prediction
         if self.time_prev != 0: # Skip on first time step
             dt = time - self.time_prev
-            self.est, self.var = self.model.predict(self.est, self.var, u, dt)
+            self.est, self.var = self.model.predict(self.est, self.var, self.u_prev, dt)
 
-        self.time_prev = time
 
         # Measurement Update
         if self.update:
             # Normalize fluorescent measurements
             y[1] = (y[1] - self.e_ofs)/self.e_fac
             # Store time, od and fl for later measurement update
-            self.time_lst.append(time)
+            self.time_lst.append(time/3600)
             self.temp_lst.append(u[0])
             self.od_lst.append(y[0])
-            self.fl_lst.append(y[1])
-            p_est_od = 0
-            p_est_fl = 0
+            self.fl_lst.append(y[1] - self.model.parameters['od_fac']*(self.est['e'] + self.est['p']))
+            self.p_est_od = 0
+            self.p_est_fl = 0
             if u[1]:
-                if not self.dil_prev: # TODO: Discard if time too long
-                    temp_avg = np.mean(self.temp_lst)
+                if not self.u_prev[1]: # TODO: Discard if time too long
+                    # calculate self.p_est_od and self.p_est_fl just before dilution
+                    temp_avg = np.mean(self.temp_lst[:-1]) # exclude current temp
                     gr = self.model.getGrowthRates(np.full(3,temp_avg))
-                    self.temp_lst -= self.temp_lst[-1]
-                    p_est_od = np.linalg.lstsq(np.exp(gr[1]*self.time_lst) - np.exp(gr[0]*self.time_lst), self.od_lst - self.od_lst[-1]*np.exp(gr[0]*self.time_lst))
-                    p_est_fl = np.linalg.lstsq(gr[2]/gr[1]*(np.exp(gr[1]*self.time_lst) - 1), self.fl_lst - self.fl_lst[-1])
+                    self.time_lst = np.array(self.time_lst) - self.time_lst[-1]
+                    A_od = np.vstack(np.exp(gr[1]*self.time_lst) - np.exp(gr[0]*self.time_lst))
+                    b_od = self.od_lst - self.od_lst[-1]*np.exp(gr[0]*self.time_lst)
+                    self.p_est_od = np.linalg.lstsq(A_od, b_od, rcond = None)[0][0]
+                    A_fl = np.vstack(gr[2]/gr[1]*(np.exp(gr[1]*self.time_lst) - 1))
+                    b_fl = self.fl_lst - self.fl_lst[-1]
+                    self.p_est_fl = np.linalg.lstsq(A_fl, b_fl, rcond = None)[0][0]
                 self.time_lst, self.temp_lst, self.od_lst, self.fl_lst = [], [], [], []
-            if abs(self.est['e'] + self.est['p'] - y[0]) < 0.1:
+            if abs(self.est['e'] + self.est['p'] - y[0]) > 0.1:
                 y[0] = 0
-            else:
-                print('no measurement update [{}] [{}:{}]'.format(self.dev_ind, math.floor(time/3600), math.floor((time/3600-math.floor(time/3600))*60)))
-            self.est, self.var = self.model.update(self.est, self.var, y, p_est_od, p_est_fl)
-            self.dil_prev = u[1]
+                print('WARNING: no od measurement update [{}] [{}:{}]'.format(self.dev_ind, math.floor(time/3600), math.floor((time/3600-math.floor(time/3600))*60)))
+            self.est, self.var = self.model.update(self.est, self.var, y, self.p_est_od, self.p_est_fl)
+
+        self.time_prev = time
+        self.u_prev = u

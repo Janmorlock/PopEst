@@ -114,23 +114,31 @@ class CustModel:
 
         H = np.array([[self.parameters['od_fac'], self.parameters['od_fac'], 1]]) # [-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])]
         y_est = x_pred[2] + self.parameters['od_fac']*od # x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind]
+        y_new = y[1]
+        R = self.R[1,1]
         m = 1
         if y[0]:
-            H = np.append([1, 1, 0], H)
+            H = np.append([[1, 1, 0]], H, axis = 0)
             y_est = np.array([od, y_est])
+            y_new = np.append(y[0], y_new)
+            R = self.R[:2,:2]
             m += 1
         if p_est_od:
-            H = np.append(H, [0, 1, 0])
+            H = np.append(H, [[0, 1, 0]], axis = 0)
             y_est = np.append(y_est, x_pred[1])
+            y_new = np.append(y_new, p_est_od)
+            R = np.diag(np.append(np.diag(R), self.R[2,2]))
             m += 1
         if p_est_fl:
-            H = np.append(H, [0, 1, 0])
+            H = np.append(H, [[0, 1, 0]], axis = 0)
             y_est = np.append(y_est, x_pred[1])
+            y_new = np.append(y_new, p_est_fl)
+            R = np.diag(np.append(np.diag(R), self.R[3,3]))
             m += 1
         
         # K = np.linalg.solve(H @ p_pred.T @ H.T + self.M @ self.parameters['r'].T @ self.M.T, H @ p_pred.T).T
-        K = p_pred @ H.T @ np.linalg.inv(H @ p_pred @ H.T + self.M[:m,:m] @ self.R[:m,:m] @ self.M[:m,:m].T)
-        xm = x_pred + K @ (y - y_est)
+        K = p_pred @ H.T @ np.linalg.inv(H @ p_pred @ H.T + self.M[:m,:m] @ R @ self.M[:m,:m].T)
+        xm = x_pred + K @ (y_new - y_est)
         xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
         Pm = (np.eye(3) - K @ H) @ p_pred
 
@@ -153,6 +161,6 @@ class CustModel:
         gr_e = self.parameters['gr_e'][0]*temp[0] + self.parameters['gr_e'][1]
         gr_p = self.parameters['gr_p'][0]*temp[1]**2 + self.parameters['gr_p'][1]*temp[1] + self.parameters['gr_p'][2]
         gr_f = self.parameters['gr_fp'][0]*temp[2]**2 + self.parameters['gr_fp'][1]*temp[2] + self.parameters['gr_fp'][2]
-        gr_f = max(100,gr_f)
+        gr_f = max(self.parameters['min_gr_fp'],gr_f)
 
         return np.array([gr_e, gr_p, gr_f])
