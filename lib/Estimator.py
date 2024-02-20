@@ -45,18 +45,21 @@ class EKF:
         self.update = update
 
         self.cc_ind = 0
-        self.time_prev = 0.0
+        self.time_prev = -1
         self.e_ofs = 0
         self.e_fac = 1
 
         self.time_lst = []
         self.temp_lst = []
         self.od_lst = []
-        self.fl_lst = []
+        self.fp_lst = []
         self.u_prev = np.array([23, False])
 
         self.p_est_fl = 0
         self.p_est_od = 0
+
+        self.p_est_od_res = 0
+        self.p_est_fl_res = 0
 
         self.est = {  # Initial state
             'e': model.parameters['od_init']*model.parameters['e_rel_init'],
@@ -91,10 +94,9 @@ class EKF:
         """
 
         # Prediction
-        if self.time_prev != 0: # Skip on first time step
+        if self.time_prev >= 0: # Skip on first time step
             dt = time - self.time_prev
             self.est, self.var = self.model.predict(self.est, self.var, self.u_prev, dt)
-
 
         # Measurement Update
         if self.update:
@@ -102,28 +104,38 @@ class EKF:
             y[1] = (y[1] - self.e_ofs)/self.e_fac
             # Store time, od and fl for later measurement update
             self.time_lst.append(time/3600)
-            self.temp_lst.append(u[0])
+            self.temp_lst.append(self.model.temps)
             self.od_lst.append(y[0])
-            self.fl_lst.append(y[1] - self.model.parameters['od_fac']*(self.est['e'] + self.est['p']))
+            self.fp_lst.append(y[1] - self.model.parameters['od_fac']*(self.est['e'] + self.est['p']))
             self.p_est_od = 0
             self.p_est_fl = 0
+            self.p_est_od_res = 0
+            self.p_est_fl_res = 0
+            temp_avg = 0
             if u[1]:
-                if not self.u_prev[1]: # TODO: Discard if time too long
+                if not self.u_prev[1] and len(self.temp_lst) > 4: # TODO: Discard if time too long
                     # calculate self.p_est_od and self.p_est_fl just before dilution
-                    temp_avg = np.mean(self.temp_lst[:-1]) # exclude current temp
-                    gr = self.model.getGrowthRates(np.full(3,temp_avg))
+                    temp_avg = np.mean(self.temp_lst[:-1], axis = 0) # exclude current temp
+                    gr = self.model.getGrowthRates(temp_avg)
                     self.time_lst = np.array(self.time_lst) - self.time_lst[-1]
+
                     A_od = np.vstack(np.exp(gr[1]*self.time_lst) - np.exp(gr[0]*self.time_lst))
                     b_od = self.od_lst - self.od_lst[-1]*np.exp(gr[0]*self.time_lst)
-                    self.p_est_od = np.linalg.lstsq(A_od, b_od, rcond = None)[0][0]
+                    [self.p_est_od], [self.p_est_od_res] = np.linalg.lstsq(A_od, b_od, rcond = None)[0:2]
+                    self.p_est_od_res = np.sqrt(self.p_est_od_res/len(self.od_lst))
+                    self.p_est_od = max(0, self.p_est_od)
+                    self.p_est_od = min(y[0], self.p_est_od)
+
                     A_fl = np.vstack(gr[2]/gr[1]*(np.exp(gr[1]*self.time_lst) - 1))
-                    b_fl = self.fl_lst - self.fl_lst[-1]
-                    self.p_est_fl = np.linalg.lstsq(A_fl, b_fl, rcond = None)[0][0]
-                self.time_lst, self.temp_lst, self.od_lst, self.fl_lst = [], [], [], []
+                    b_fl = self.fp_lst - self.fp_lst[-1]
+                    [self.p_est_fl], [self.p_est_fl_res] = np.linalg.lstsq(A_fl, b_fl, rcond = None)[0:2]
+                    self.p_est_fl_res = np.sqrt(self.p_est_fl_res/len(self.fp_lst))
+                    self.p_est_fl = max(0, self.p_est_fl)
+                    self.p_est_fl = min(y[0], self.p_est_fl)
+                self.time_lst, self.temp_lst, self.od_lst, self.fp_lst = [], [], [], []
             if abs(self.est['e'] + self.est['p'] - y[0]) > 0.1:
-                y[0] = 0
                 print('WARNING: no od measurement update [{}] [{}:{}]'.format(self.dev_ind, math.floor(time/3600), math.floor((time/3600-math.floor(time/3600))*60)))
-            self.est, self.var = self.model.update(self.est, self.var, y, self.p_est_od, self.p_est_fl)
+            self.est, self.var = self.model.update(self.est, self.var, y, self.p_est_od, self.p_est_fl, self.p_est_od_res, self.p_est_fl_res, temp_avg)
 
         self.time_prev = time
         self.u_prev = u

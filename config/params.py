@@ -2,9 +2,9 @@ import numpy as np
 
 class Params:
     def __init__(self):
-        self.default = {  # Set default parameters
-            'temp_pre_e' : 37,
-            'temp_pre_p' : 26,
+        self.default = {
+            'temp_pre_e' : 33,
+            'temp_pre_p' : 33,
             'crit_temp' : 33.26, # around this temperature both bacteria should be growing at the same rate
 
             'od_setpoint' : 0.5,
@@ -43,7 +43,7 @@ class Params:
 
             'sigma_e_init' : 0.03,
             'sigma_p_init' : 0.03,
-            'sigma_fp_init' : 20, # 0.07
+            'sigma_fp_init' : 100, # 0.07
 
             # Process noise standard deviation
             'sigma_e_dil' : 1e-2,
@@ -58,9 +58,28 @@ class Params:
             'sigma_p' : 1e-4,
             'sigma_fp' : 5e5,
 
+            # Measurement update selection
+            'od_update' : True,
+            'fl_update' : True,
+            'od_gr_update' : True,
+            'fl_gr_update' : True,
+
             # Measurement noise standard deviation
-            'sigma_od' : 5e-2,
-            'sigma_fl' : 1e3, #1e1,
-            'sigma_od_gr' : 1e-1,
-            'sigma_fl_gr' : 1e5, #1e2,
+            'sigma_od' : 1e-2,
+            'sigma_fl' : 3e2, #1e1,
+            'sigma_od_gr' : 4e-2,
+            'sigma_fl_gr' : 6e-2, #1e2,
+            'od_gr_res_to_sigma' : 0.0015, #this lstsq residual corresponds to an putida estimation error usually smaller than of 0.05 (approximated from the simulation)
+            'od_gr_prox_sigma_max' : 0.3, #this is the maximum value the uncertainty gets increased through proximity of both growth rates
+            'od_gr_prox_sigma_decay' : 0.05, #at 0.05 growth rate difference the growth rate uncertainty is 1/e of the maximum growth rate uncertainty
+            'fl_gr_res_to_sigma' : 10, #this lstsq residual corresponds to an putida estimation error usually smaller than of 0.05 (approximated from the simulation)
+            'fl_gr_temp_prox_sigma_max' : 0.2, #this is the maximum value the uncertainty gets increased through proximity to 35 degrees
+            'gr_temp_sigma_decay' : 0.7, #at 1 degree from the max temperature the temp uncertainty is approx 1/10th of the maximum temp uncertainty
+
+
+            ### Parameters for the Controller
+            # PID gains
+            'kp' : 15,
+            'ki' : 0.01,
+            'kd' : 0,
         }

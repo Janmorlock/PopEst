@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Tuple
+import math
 
 from config.params import Params
 
@@ -9,10 +10,10 @@ class CustModel:
         self.parameters = Params().default
         self.dithered = False
 
-        self.temps = np.array([self.parameters['temp_pre_e'],self.parameters['temp_pre_p'],self.parameters['temp_pre_p']],dtype='float')
-        self.lp_fac = np.exp(-self.parameters['ts']/np.array(self.parameters['lp_ht']))
         self.ts = self.parameters['ts']
         self.ts_h = self.ts/3600
+        self.temps = np.array([self.parameters['temp_pre_e'],self.parameters['temp_pre_p'],self.parameters['temp_pre_p']],dtype='float')
+        self.lp_fac = np.exp(-self.ts_h/np.array(self.parameters['lp_ht']))
 
         self.Q = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
         self.Q_dil = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
@@ -20,8 +21,7 @@ class CustModel:
         self.L = np.eye(3)
         self.L_dil = np.eye(3)
 
-        self.R = np.diag([self.parameters['sigma_od']**2, self.parameters['sigma_fl']**2, self.parameters['sigma_od_gr']**2, self.parameters['sigma_fl_gr']**2])
-        self.M = np.eye(4)
+        self.M = np.eye(5)
 
     def dilute(self, x_prev: np.ndarray, p_prev: np.ndarray):
         '''
@@ -103,44 +103,60 @@ class CustModel:
 
         return dict(zip(x_prev_dic, x_pred)), p_pred
     
-    def update(self, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray, p_est_od: float, p_est_fl: float) -> Tuple[dict, np.ndarray]:
+    def update(self, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray, p_est_od: float, p_est_fl: float, p_est_od_res: float, p_est_fl_res, temp_avg: np.ndarray) -> Tuple[dict, np.ndarray]:
         '''
         Update Step
-        
+
         Updates the states and their variance after a measurement y.
         '''
         x_pred = np.fromiter(x_pred_dic.values(),dtype=float)
         od = x_pred[0] + x_pred[1]
 
-        H = np.array([[self.parameters['od_fac'], self.parameters['od_fac'], 1]]) # [-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])]
-        y_est = x_pred[2] + self.parameters['od_fac']*od # x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind]
-        y_new = y[1]
-        R = self.R[1,1]
-        m = 1
-        if y[0]:
-            H = np.append([[1, 1, 0]], H, axis = 0)
-            y_est = np.array([od, y_est])
-            y_new = np.append(y[0], y_new)
-            R = self.R[:2,:2]
+        H = np.array([[]])
+        y_est = np.array([])
+        y_new = np.array([])
+        R = np.diag([])
+        
+        m = 0
+        if abs(od - y[0]) < 0.1 and self.parameters['od_update']:
+            H = np.array([[1, 1, 0]])
+            y_est = np.array([od])
+            y_new = np.array([y[0]])
+            R = np.diag([self.parameters['sigma_od']**2])
             m += 1
-        if p_est_od:
-            H = np.append(H, [[0, 1, 0]], axis = 0)
-            y_est = np.append(y_est, x_pred[1])
-            y_new = np.append(y_new, p_est_od)
-            R = np.diag(np.append(np.diag(R), self.R[2,2]))
+        if y[1] and self.parameters['fl_update']:
+            H = np.reshape(np.append(H, [self.parameters['od_fac'], self.parameters['od_fac'], 1]),(-1,3)) # [-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])]
+            y_est = np.append(y_est, x_pred[2] + self.parameters['od_fac']*od) # x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind]
+            y_new = np.append(y_new, y[1])
+            R = np.diag(np.append(np.diag(R), [self.parameters['sigma_fl']**2]))
             m += 1
-        if p_est_fl:
-            H = np.append(H, [[0, 1, 0]], axis = 0)
+        if p_est_od and self.parameters['od_gr_update']:
+            H = np.reshape(np.append(H, [[1, 0, 0], [0, 1, 0]]),(-1,3))
+            y_est = np.append(y_est, [x_pred[0], x_pred[1]])
+            y_new = np.append(y_new, [y[0] - p_est_od, p_est_od])
+            # Increase the variance of the measurement according to the residual of the lsq solution and the proximity of both growth rates
+            gr = self.getGrowthRates(temp_avg)
+            R = np.diag(np.append(np.diag(R),
+                                  [(self.parameters['sigma_od_gr'] + p_est_od_res/self.parameters['od_gr_res_to_sigma']*0.05 + np.exp(-abs(gr[1] - gr[0])/self.parameters['od_gr_prox_sigma_decay'])*self.parameters['od_gr_prox_sigma_max'])**2,
+                                   (self.parameters['sigma_od_gr'] + p_est_od_res/self.parameters['od_gr_res_to_sigma']*0.05 + np.exp(-abs(gr[1] - gr[0])/self.parameters['od_gr_prox_sigma_decay'])*self.parameters['od_gr_prox_sigma_max'])**2]))
+            m += 2
+        if p_est_fl and self.parameters['fl_gr_update']:
+            H = np.reshape(np.append(H, [0, 1, 0]),(-1,3))
             y_est = np.append(y_est, x_pred[1])
             y_new = np.append(y_new, p_est_fl)
-            R = np.diag(np.append(np.diag(R), self.R[3,3]))
+            # Increase the variance of the measurement according to the residual of the lsq solution and the proximity of 35ºC (strong change in production rate)
+            R = np.diag(np.append(np.diag(R), (self.parameters['sigma_fl_gr'] + p_est_fl_res/self.parameters['fl_gr_res_to_sigma']*0.05 + np.exp(-abs(temp_avg[2] - 35)/self.parameters['gr_temp_sigma_decay'])*self.parameters['fl_gr_temp_prox_sigma_max'])**2))
             m += 1
         
         # K = np.linalg.solve(H @ p_pred.T @ H.T + self.M @ self.parameters['r'].T @ self.M.T, H @ p_pred.T).T
-        K = p_pred @ H.T @ np.linalg.inv(H @ p_pred @ H.T + self.M[:m,:m] @ R @ self.M[:m,:m].T)
-        xm = x_pred + K @ (y_new - y_est)
-        xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
-        Pm = (np.eye(3) - K @ H) @ p_pred
+        if m == 0:
+            xm = x_pred.copy()
+            Pm = p_pred.copy()
+        else:
+            K = p_pred @ H.T @ np.linalg.inv(H @ p_pred @ H.T + self.M[:m,:m] @ R @ self.M[:m,:m].T)
+            xm = x_pred + K @ (y_new - y_est)
+            xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
+            Pm = (np.eye(3) - K @ H) @ p_pred
 
         # Constrain states to be positive
         if xm[0] < 0:
