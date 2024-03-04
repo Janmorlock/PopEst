@@ -5,7 +5,7 @@ import matplotlib
 import os
 
 from CbData import CbData
-from paramsData import CbDataParam
+from CbDataParams import CbDataParam
 from runWithData import CritTemp
 from config.params import Params
 from estFlProdRate import get_prs

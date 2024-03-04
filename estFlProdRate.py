@@ -7,7 +7,7 @@ import os
 
 from config.params import Params
 from CbData import CbData
-from paramsData import CbDataParam
+from CbDataParams import CbDataParam
 
 def simulateFlProtein(cb_hrs, fp_init, p_puti, dil, temp, parameters, temp_lst = np.empty, gr = np.empty, train = False, fp = np.empty(1), err = []):
     data_l = len(p_puti)

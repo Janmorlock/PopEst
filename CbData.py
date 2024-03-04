@@ -1,8 +1,7 @@
 import glob
 import pandas as pd
-import numpy as np
 
-from paramsData import CbDataParam
+from CbDataParams import CbDataParam
 
 class CbData:
     def __init__(self, cbParam: CbDataParam):

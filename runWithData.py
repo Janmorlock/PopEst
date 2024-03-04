@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import os
 
-from paramsData import CbDataParam
+from CbDataParams import CbDataParam
 from CbData import CbData
 from lib.Estimator import EKF
 from config.params import Params
