@@ -164,8 +164,51 @@ class CbDataParam:
                 # Sampcycle indices as in Matlab
                 sampcycle = np.array([[0,1800] for i in range(n_reactors)])
                 titles = ['C7M0','C7M1','C7M2','C7M3','C8M0','C8M1','C8M2','C8M3','C9M0','C9M1','C9M2','C9M3','C6M0','C6M1','C6M2','C6M3']
+            case '081-1':
+                path = '../../Ting/Experiments/081-1'
+                # Indeces of files of interest
+                file_ind = [4,5,6,7]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = [np.array([1, 118, 244, 352, 469, 579, 693, 1433, 1537]),
+                            np.array([1, 118, 244, 352, 469, 579, 693, 1433, 1537]),
+                            np.array([1, 118, 244, 351, 468, 578, 692, 1432, 1536]),
+                            np.array([1, 118, 244, 351, 468, 578, 692, 1432, 1536])]
+                sampcycle = [sampcycle[i] - 1 for i in range(len(file_ind))] # adapts indeces to python
+                titles = ['C7M0','C7M1','C7M2','C7M3']
+                reactors = ['Faith', 'Alabama', 'George', 'Tammy']
+            case '081-2':
+                path = '../../Ting/Experiments/081-2'
+                # Indeces of files of interest
+                file_ind = [[7,8,12],[4,9],[5,10],[6,11]]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = [np.array([1, 116, 216, 326, 462, 462, 576, 576, 700, 700, 1476, 1476]),
+                            np.array([1, 116, 216, 352, 462, 462, 576, 576, 700, 700, 1476, 1476]),
+                            np.array([1, 116, 216, 351, 462, 462, 576, 576, 700, 700, 1476, 1476]),
+                            np.array([1, 116, 216, 351, 462, 462, 576, 576, 700, 700, 1476, 1476])]
+                sampcycle = [sampcycle[i] - 1 for i in range(len(file_ind))] # adapts indeces to python
+                titles = ['C7M0','C7M1','C7M2','C7M3']
+                reactors = ['Faith', 'Allan', 'George', 'Tammy']
+            case '081-3':
+                path = '../../Ting/Experiments/081-3'
+                # Indeces of files of interest
+                file_ind = [[6,12],[7,13],[8,14],[9,15],[10,16],[11,17]]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = [np.array([1, 1, 76, 151, 197, 252, 302, 358, 412, 467, 555, 598, 648, 694, 743, 791, 849, 883, 957, 1147, 1198, 1248, 1303]),
+                            np.array([1, 1, 76, 151, 197, 252, 302, 358, 412, 467, 555, 598, 648, 694, 743, 791, 849, 883, 957, 1147, 1198, 1248, 1303]),
+                            np.array([1, 1, 76, 151, 197, 252, 302, 358, 412, 467, 555, 598, 648, 694, 743, 791, 849, 883, 957, 1147, 1198, 1248, 1303]),
+                            np.array([1, 1, 76, 151, 197, 252, 302, 358, 412, 467, 555, 598, 648, 694, 743, 791, 849, 883, 957, 1147, 1198, 1248, 1303]),
+                            np.array([1, 1, 76, 151, 197, 252, 302, 358, 412, 467, 555, 598, 648, 694, 743, 791, 849, 883, 957, 1147, 1198, 1248, 1303]),
+                            np.array([1, 1, 76, 151, 197, 252, 302, 358, 412, 467, 555, 598, 648, 694, 743, 791, 849, 883, 957, 1147, 1198, 1248, 1303])]
+                sampcycle = [sampcycle[i] - 1 for i in range(len(file_ind))] # adapts indeces to python
+                titles = ['C7M0','C7M1','C7M2','C7M3','C7M4','C7M5']
+                reactors = ['Faith', 'Allan', 'George', 'Tammy', 'Taylor', 'Garth']
             case _:
                 raise Exception('Data information of {} not given.'.format(dataName))
+        
+        file_ind = [[file_ind[j]] if type(file_ind[j]) == int else file_ind[j] for j in range(n_reactors)]
         
         return path, file_ind, sampcycle, titles, reactors
 
@@ -198,7 +241,30 @@ def getFcData(dataName):
             FC_data = np.append(FC_data1.to_numpy(),FC_data2.to_numpy())
             cb_fc_ec = [FC_data[4::8],
                         FC_data[6::8]]
+        case '081-1':
+            FC_file = pd.read_excel('../../Ting/Experiments/081-1/240221 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_data = FC_file['% Parent.1'] + FC_file['% Parent.2']
+            cb_fc_ec = np.array([FC_data[4:-4:4].to_numpy(),
+                                FC_data[5:-4:4].to_numpy(),
+                                FC_data[6:-4:4].to_numpy(),
+                                FC_data[7:-4:4].to_numpy()])
+        case '081-2':
+            FC_file = pd.read_excel('../../Ting/Experiments/081-2/240227 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_data = FC_file['% Parent.1'] + FC_file['% Parent.2']
+            cb_fc_ec = np.array([FC_data[4::4].to_numpy(),
+                                FC_data[5::4].to_numpy(),
+                                FC_data[6::4].to_numpy(),
+                                FC_data[7::4].to_numpy()])
+        case '081-3':
+            FC_file = pd.read_excel('../../Ting/Experiments/081-3/240304 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_data = FC_file['% Parent.1'] + FC_file['% Parent.2']
+            cb_fc_ec = np.array([FC_data[6::6].to_numpy(),
+                                FC_data[7::6].to_numpy(),
+                                FC_data[8::6].to_numpy(),
+                                FC_data[9::6].to_numpy(),
+                                FC_data[10::6].to_numpy(),
+                                FC_data[11::6].to_numpy()])
         case _:
-            cb_fc_ec = 0
+            cb_fc_ec = np.array([])
             print('cb_fc_ec information of {} not given.'.format(dataName))
     return cb_fc_ec

@@ -1,6 +1,3 @@
-
-from logging import critical
-from turtle import back
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -10,6 +7,8 @@ import os
 from CbData import CbData
 from paramsData import CbDataParam
 from runWithData import CritTemp
+from config.params import Params
+from estFlProdRate import get_prs
 
 if __name__ == "__main__":
 
@@ -19,7 +18,7 @@ if __name__ == "__main__":
     cbParam = CbDataParam(dataName)
     results_dir = "Images/{}".format(dataName)
 
-    cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
+    cbData = CbData(cbParam)
     temps = []
     mean = [[] for b in range(len(bac))]
     median = [[] for b in range(len(bac))]
@@ -30,6 +29,8 @@ if __name__ == "__main__":
     delay = [3, 0]
 
     matplotlib.style.use('default')
+    # matplotlib.rc('text', usetex=True)
+    plt.rcParams['font.family'] = 'Times New Roman'
     n_rows = math.ceil(cbParam.n_reactors/2)
     n_culumns = 2 if cbParam.n_reactors > 1 else 1
     fig, ax = plt.subplots(n_rows,2,sharex='all',sharey='all')
@@ -138,9 +139,26 @@ if __name__ == "__main__":
     cT = CritTemp(e_coefficients, p_coefficients)
     critical_temp = round(cT.getCritTemp(),2)
     print("Critical temperature: ", critical_temp)
-    fig_gr, ax = plt.subplots()
-    fig_gr.set_figheight(6)
-    fig_gr.set_figwidth(8)
+
+    parameters = Params().default
+    cbParam.n_reactors = 8
+    cbParam.file_ind = cbParam.file_ind[0:cbParam.n_reactors]
+    cbParam.sampcycle[0][0] = 700
+    cbParam.sampcycle[1] = [0,100]
+    cbData = CbData(cbParam)
+    e_ofs = [parameters['e_ofs'][cbParam.reactors[j]] for j in range(cbParam.n_reactors)]
+    e_fac = [parameters['e_fac'][cbParam.reactors[j]] for j in range(cbParam.n_reactors)]
+    e = [(cbData.fl[j]*cbData.b1[j] - e_ofs[j])/e_fac[j] + e_ofs[j] for j in range(cbParam.n_reactors)]
+    prs = get_prs(cbData, cbParam, temps, parameters, e)
+    mean_fl = [np.mean(prs[t]) for t in range(len(prs))]
+    std_fl = [np.std(prs[t]) for t in range(len(prs))]
+    media_fl = [np.median(prs[t]) for t in range(len(prs))]
+    pr_model4 = np.poly1d(np.polyfit(np.array(temps)-32.5, mean_fl, 4, w = 1/np.array(std_fl)))
+
+    fig_gr, (ax, pr_ax) = plt.subplots(2,1)
+    plt.subplots_adjust(hspace=0.07)
+    fig_gr.set_figheight(7)
+    fig_gr.set_figwidth(7)
     # Plot gradients
     bp_p = ax.boxplot(boxdata[0], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
                 meanprops=dict(markerfacecolor = 'g', markeredgecolor = 'g'),
@@ -156,8 +174,15 @@ if __name__ == "__main__":
                 flierprops=dict(markeredgecolor="m", alpha=0.5),
                 capprops=dict(color="m", alpha=0.5),
                 whiskerprops=dict(color="m", alpha=0.5))
+    bp_fl = pr_ax.boxplot(prs, positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
+                        meanprops=dict(markerfacecolor = '#0000ff', markeredgecolor = '#0000ff'),
+                        boxprops=dict(color = '#0000ff'),
+                        medianprops=dict(color = '#0000ff'),
+                        flierprops=dict(markeredgecolor = '#0000ff'),
+                        capprops=dict(color = '#0000ff'),
+                        whiskerprops=dict(color = '#0000ff'))
     # fill with colors
-    for bp in [bp_p, bp_e]:
+    for bp in [bp_p, bp_e, bp_fl]:
         for patch in bp['boxes']:
             patch.set_facecolor((1,1,1,0))
 
@@ -165,23 +190,32 @@ if __name__ == "__main__":
     x = np.linspace(temps[0],temps[-1],100)
     ax.plot(x, p_model(x), 'g', linewidth=2, label = 'ivw fit')
     ax.plot(x, e_model(x), 'm', linewidth=2, label = 'ivw fit')
-    ax.vlines(critical_temp, 0, 1.4, lw = 1, colors='k', linestyles='dashed')
-    # xticks = list(set(np.round(ax.get_xticks(),0))) + [critical_temp]
-    # xticks.sort()
-    # ax.set_xticks(xticks)
-    # ax.set_xlabel(r'Temperature $[^{\circ}C]$')
-    ax.set_ylabel(r'Growth rate $[\frac{1}{h}]$')
+    pr_ax.plot(x, np.maximum(pr_model4(x-32.5),media_fl[-1]), '#0000ff', linewidth=2, label = 'ivw fit')
+    # ax.vlines(critical_temp, 0, 1.4, lw = 1, colors='k', linestyles='dashed')
+    xticks = list(set(np.int16(pr_ax.get_xticks())))# + [critical_temp]
+    xticks_lb = ['29', '30', '31', '32', '33', '34', '35', '36']
+    xticks.sort()
+    ax.set_xticks([])
+    pr_ax.set_xticks(xticks, labels=xticks_lb)
+    ax.set_ylabel(r'Bacteria Growth Rate $[\frac{1}{h}]$')
+    pr_ax.set_xlabel(r'Temperature $[^{\circ}C]$')
+    pr_ax.set_ylabel(r'Pyoverdine Production Rate $[\frac{1}{h}]$')
     h,l = ax.get_legend_handles_labels()
     h = [bp_p["boxes"][0], bp_e["boxes"][0], *h]
-    l = ['P. putida', 'E. coli', *l]
+    l = [r'$\it{P. putida}$', r'$\it{E. coli}$', *l]
     ax.legend(h,l, loc='best')
-    ax.set_title("Bacteria Growth Rates")
-    ax.set_ylim([0,1.4])
+    h,l = pr_ax.get_legend_handles_labels()
+    h = [bp_fl["boxes"][0], *h]
+    l = [r'$\it{Pyoverdine}$', *l]
+    pr_ax.legend(h,l, loc='best')
 
+    # ax.set_title("Bacteria Growth Rates")
+    ax.set_ylim([0,1.3])
+    pr_ax.set_ylim([0,8000])
     # Save figures
     fig.suptitle(dataName)
-    fig.tight_layout()
+    # fig.tight_layout()
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir + "/odGradient.png", transparent=True)
-    fig_gr.savefig(results_dir + "/growthRates.png", transparent=True)
+    # fig.savefig(results_dir + "/odGradient.png", transparent=True)
+    fig_gr.savefig(results_dir + "/2_productionRates.pdf", transparent=True)

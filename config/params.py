@@ -13,7 +13,7 @@ class Params:
             'ts' : 1, # seconds
 
             'avg_temp' : True,
-            'lp_ht' : [1/60,1,1/60], # IIR Filter halftime in h for temperature delay of [e,p,fp] production
+            'lp_ht' : [1/60,1,45/60], # IIR Filter halftime in h for temperature delay of [e,p,fp] production
             'min_fl' : [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061],
             'max_fl' : [0.280, 0.408, 0.355, 0.375, 0.323, 0.391, 0.297, 0.310],
             # 'fl_ofs' : [0.06681171028640953, 0.10124284006186575, 0.012420329020951698, 0.09948044745557398, 0.08938092574497708, 0.11260643351414071, 0.05869055434532918, 0.048870744085821975],
@@ -29,34 +29,34 @@ class Params:
             # Quadratic line fitting to 075_1 data
             'gr_p' : [-0.02208, 1.3796, -20.56996],
 
-            # Quadratic line fitting to 062_4 data
-            # 'gr_fp' : [-0.00997995390810818, 0.5878457848575587, -8.328492791512256],
-            'gr_fp' : [-487.10807, 30798.23482, -480631.03115],
+            # Quadratic line fitting to 075-1 data
+            # 'gr_fp' : [-487.10807, 30798.23482, -480631.03115],
+            'gr_fp' : [44.49572512791427, 31.820479677943325, -917.5864128224449, -886.6854718162117, 6318.711894680335],
             'min_gr_fp' : 20,
 
 
             ### Parameters for the Kalman filter
             'od_init' : 0.25, # initial belief optical density
-            'e_rel_init' : 0.5, # %, initial relative belief of e. coli abundance
+            'e_rel_init' : 0.5, # initial relative belief of e. coli abundance
             # 'fp_init' : 0.056, # initial belief of fluorescence
             'fp_init' : 620, # initial belief of fluorescence
 
-            'sigma_e_init' : 0.03,
-            'sigma_p_init' : 0.03,
-            'sigma_fp_init' : 100, # 0.07
+            'sigma_e_init' : 0.2,
+            'sigma_p_init' : 0.2,
+            'sigma_fp_init' : 200, # 0.07
 
             # Process noise standard deviation
             'sigma_e_dil' : 1e-2,
             'sigma_p_dil' : 1e-2,
             'sigma_fp_dil' : 1e2,
 
-            'sigma_e_dil_dit' : 1e-2,
-            'sigma_p_dil_dit' : 1e-2,
+            'sigma_e_dil_dit' : 5e-3,
+            'sigma_p_dil_dit' : 5e-3,
             'sigma_fp_dil_dit' : 1e2,
 
             'sigma_e' : 1e-4,
             'sigma_p' : 1e-4,
-            'sigma_fp' : 5e5,
+            'sigma_fp' : 8e5,
 
             # Measurement update selection
             'od_update' : True,
@@ -65,16 +65,18 @@ class Params:
             'fl_gr_update' : True,
 
             # Measurement noise standard deviation
-            'sigma_od' : 1e-2,
-            'sigma_fl' : 3e2, #1e1,
-            'sigma_od_gr' : 4e-2,
-            'sigma_fl_gr' : 6e-2, #1e2,
-            'od_gr_res_to_sigma' : 0.0015, #this lstsq residual corresponds to an putida estimation error usually smaller than of 0.05 (approximated from the simulation)
-            'od_gr_prox_sigma_max' : 0.3, #this is the maximum value the uncertainty gets increased through proximity of both growth rates
-            'od_gr_prox_sigma_decay' : 0.05, #at 0.05 growth rate difference the growth rate uncertainty is 1/e of the maximum growth rate uncertainty
-            'fl_gr_res_to_sigma' : 10, #this lstsq residual corresponds to an putida estimation error usually smaller than of 0.05 (approximated from the simulation)
-            'fl_gr_temp_prox_sigma_max' : 0.2, #this is the maximum value the uncertainty gets increased through proximity to 35 degrees
-            'gr_temp_sigma_decay' : 0.7, #at 1 degree from the max temperature the temp uncertainty is approx 1/10th of the maximum temp uncertainty
+            'sigma_od' : 3e-2,
+            'sigma_fl' :2e1,
+            'sigma_od_gr' : 3e-2,
+            'sigma_fl_gr' : 4e-2,
+            'od_gr_res_to_sigma' : 0.001, #this lstsq residual corresponds to an putida estimation error usually smaller than of 0.05 (approximated from the simulation)
+            'od_gr_prox_sigma_max' : 0.4, #this is the maximum value the uncertainty gets increased through proximity of both growth rates
+            'od_gr_prox_sigma_decay' : 0.04, #at 0.05 growth rate difference the growth rate uncertainty is 1/e of the maximum growth rate uncertainty
+            'fl_gr_res_to_sigma' : 7, #this lstsq residual corresponds to an putida estimation error usually smaller than of 0.05 (approximated from the simulation)
+            'fl_gr_temp_prox_sigma_max' : 0.2, #this is the maximum value the uncertainty gets increased through proximity to 35.5 degrees
+            'fl_gr_temp_sigma_decay' : 0.7, #at 1 degree from the max temperature the temp uncertainty is approx 1/10th of the maximum temp uncertainty
+            'fl_gr_temp2_prox_sigma_max' : 0.1, #this is the maximum value the uncertainty gets increased through proximity to 29 degrees
+            'fl_gr_temp2_sigma_decay' : 0.5, #at 0.5 degree from the max temperature the temp uncertainty is approx 1/e of the maximum temp uncertainty
 
 
             ### Parameters for the Controller

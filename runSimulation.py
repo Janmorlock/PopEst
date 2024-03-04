@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import os
+import math
 
 if __name__ == "__main__":
 
@@ -12,8 +13,9 @@ if __name__ == "__main__":
     pre_time_m = 60
     timeEnd_m = 60 * 30 + pre_time_m
     alpha_temp = 0.8
-    od_th = 0.55
-    od_l_th = 0.44
+
+    od_th = 0.53
+    od_l_th = 0.46
     dithered = True
     noise = False
     test_var = '' # 'pid' or 'single_est' or 'combi_est'
@@ -45,6 +47,7 @@ if __name__ == "__main__":
     # Initialize plot
     n_rows = 1
     matplotlib.style.use('default')
+    plt.rcParams['font.family'] = 'Times New Roman'
     fig, ax = plt.subplots(n_rows,n_culumns,sharey='all')
     if n_culumns == 1:
         ax = [ax]
@@ -183,6 +186,7 @@ if __name__ == "__main__":
                     pp_rel_target = 0.2
                 else:
                     pp_rel_target = 0.8
+                pp_rel_target = -0.4*math.sin(2*math.pi*(time_m-pre_time_m)/(20*60)) + 0.5
                 # log
                 pp_rel_target_arr[time_m] = pp_rel_target
                 
@@ -198,7 +202,6 @@ if __name__ == "__main__":
                 err_prev = pp_rel_err
                 # Anti Reset Windup
                 if model_est.parameters['ki'] > 0:
-                    # err_cum += (th_target - temp_target)
                     if abs(th_target - temp_target) > 0:
                         err_cum -= pp_rel_err * model_est.parameters['ki']
 
@@ -264,4 +267,4 @@ if __name__ == "__main__":
     fig.tight_layout()
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir + "/sim{}{}.png".format('_' + test_var if test_var else '', '_noise' if noise else ''), transparent=True)
+    fig.savefig(results_dir + "/sim{}{}_od_sine.png".format('_' + test_var if test_var else '', '_noise' if noise else ''), transparent=True)

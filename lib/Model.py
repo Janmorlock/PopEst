@@ -112,15 +112,21 @@ class CustModel:
         x_pred = np.fromiter(x_pred_dic.values(),dtype=float)
         od = x_pred[0] + x_pred[1]
 
+        xm = x_pred.copy()
+        Pm = p_pred.copy()
+
         H = np.array([[]])
         y_est = np.array([])
         y_new = np.array([])
         R = np.diag([])
         
         m = 0
-        if abs(od - y[0]) < 0.1 and self.parameters['od_update']:
+
+        if self.parameters['od_update']:
+            xm[0] *= y[0]/od
+            xm[1] *= y[0]/od
             H = np.array([[1, 1, 0]])
-            y_est = np.array([od])
+            y_est = np.array([y[0]])
             y_new = np.array([y[0]])
             R = np.diag([self.parameters['sigma_od']**2])
             m += 1
@@ -145,16 +151,16 @@ class CustModel:
             y_est = np.append(y_est, x_pred[1])
             y_new = np.append(y_new, p_est_fl)
             # Increase the variance of the measurement according to the residual of the lsq solution and the proximity of 35ºC (strong change in production rate)
-            R = np.diag(np.append(np.diag(R), (self.parameters['sigma_fl_gr'] + p_est_fl_res/self.parameters['fl_gr_res_to_sigma']*0.05 + np.exp(-abs(temp_avg[2] - 35)/self.parameters['gr_temp_sigma_decay'])*self.parameters['fl_gr_temp_prox_sigma_max'])**2))
+            R = np.diag(np.append(np.diag(R), (self.parameters['sigma_fl_gr']
+                                               + p_est_fl_res/self.parameters['fl_gr_res_to_sigma']*0.05
+                                               + np.exp(-abs(temp_avg[2] - 35.5)/self.parameters['fl_gr_temp_sigma_decay'])*self.parameters['fl_gr_temp_prox_sigma_max']
+                                               + np.exp(-abs(temp_avg[2] - 29)/self.parameters['fl_gr_temp2_sigma_decay'])*self.parameters['fl_gr_temp2_prox_sigma_max'])**2))
             m += 1
         
         # K = np.linalg.solve(H @ p_pred.T @ H.T + self.M @ self.parameters['r'].T @ self.M.T, H @ p_pred.T).T
-        if m == 0:
-            xm = x_pred.copy()
-            Pm = p_pred.copy()
-        else:
+        if m > 0:
             K = p_pred @ H.T @ np.linalg.inv(H @ p_pred @ H.T + self.M[:m,:m] @ R @ self.M[:m,:m].T)
-            xm = x_pred + K @ (y_new - y_est)
+            xm += K @ (y_new - y_est)
             xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
             Pm = (np.eye(3) - K @ H) @ p_pred
 
@@ -176,7 +182,10 @@ class CustModel:
         """
         gr_e = self.parameters['gr_e'][0]*temp[0] + self.parameters['gr_e'][1]
         gr_p = self.parameters['gr_p'][0]*temp[1]**2 + self.parameters['gr_p'][1]*temp[1] + self.parameters['gr_p'][2]
-        gr_f = self.parameters['gr_fp'][0]*temp[2]**2 + self.parameters['gr_fp'][1]*temp[2] + self.parameters['gr_fp'][2]
+        # gr_f = self.parameters['gr_fp'][0]*temp[2]**2 + self.parameters['gr_fp'][1]*temp[2] + self.parameters['gr_fp'][2]
+        gr_f = 0
+        for r in range(len(self.parameters['gr_fp'])):
+            gr_f += self.parameters['gr_fp'][r]*(temp[2]-32.5)**(len(self.parameters['gr_fp']) - 1 - r)
         gr_f = max(self.parameters['min_gr_fp'],gr_f)
 
         return np.array([gr_e, gr_p, gr_f])

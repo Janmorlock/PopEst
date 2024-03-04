@@ -46,20 +46,72 @@ def simulateFlProtein(cb_hrs, fp_init, p_puti, dil, temp, parameters, temp_lst =
             
     return x
 
-if __name__ == "__main__":    
+### Explicit production rate estimation
+def get_prs(cbData: CbData, cbParam: CbDataParam, temp_lst: list, parameters: dict, e: list):
+    
+    temp_sp = []
+    gr = []
+    for j in range(cbParam.n_reactors):
+        time_h_list = []
+        od_list = []
+        dfl_list = []
+        dp_mat = []
+        dfl_mat = []
+        temp_sp_list = []
+        diluted = False
+        gr_constant = True
+        time_beg = 0
+        for i in range(len(cbData.time[j])):
+            if cbData.temp_sp[j][i] != cbData.temp_sp[j][max(0,i-1)]:
+                gr_constant = False
+                time_beg = cbData.time_h[j][i]
+            if cbData.time_h[j][i] - time_beg > 2.5 and not gr_constant:
+                gr_constant = True
+            if cbData.dil[j][i] and not cbData.dil[j][max(0,i-1)]:
+                dfl_list.append(e[j][i] - cbData.od[j][i]*parameters['od_fac'])
+                od_list.append(cbData.od[j][i])
+                time_h_list.append(cbData.time_h[j][i])
+                if diluted and gr_constant: # don't get gradient before first dilution, after temperature change
+                    p_ln_fit = np.polyfit(time_h_list-time_h_list[0], np.log(od_list), 1, w = np.sqrt(od_list)) # fit exponential, adjusted weight to account for transformation
+                    mu = p_ln_fit[0]
+                    p0 = np.exp(p_ln_fit[1])
+                    dp_list = p0/mu*(np.exp(mu*np.array(time_h_list-time_h_list[0]))-1)# integrate exp
+                    dfl_mat.append(dfl_list)
+                    dp_mat.append(np.array(dp_list))
+                    temp_sp_list.append(cbData.temp_sp[j][i])
+                diluted = True
+                dfl_list = []
+                time_h_list = []
+                od_list = []
+            if gr_constant and not cbData.dil[j][i]:
+                dfl_list.append(e[j][i] - cbData.od[j][i]*parameters['od_fac'])
+                od_list.append(cbData.od[j][i])
+                time_h_list.append(cbData.time_h[j][i])
+        # Fit lines and get growth rates
+        for r in range(len(temp_sp_list)):
+            if len(dfl_mat[r]) > 5:
+                gr.append(np.polyfit(dp_mat[r],dfl_mat[r],1)[0])
+                temp_sp.append(temp_sp_list[r])
+    # Sort gr according to temperature
+    prs = [[] for t in range(len(temp_lst))]
+    for r in range(len(temp_sp)):
+        prs[temp_lst.index(temp_sp[r])].append(gr[r])
+    
+    return prs
+
+if __name__ == "__main__":
     # SPECIFY DATA
     dataName = '075-1'
     cbParam = CbDataParam(dataName)
     cbParam.n_reactors = 8
-    cbParam.file_ind = [4,5,6,7,8,10,12,14]
+    cbParam.file_ind = cbParam.file_ind[0:cbParam.n_reactors]
     cbParam.sampcycle[0][0] = 700
     cbParam.sampcycle[1] = [0,100]
-    train = True
-
+    train = False
     n_samples = 10000
-    
+
+    cbData = CbData(cbParam)
     # Get occuring temperatures
-    cbData = CbData(cbParam.path, cbParam.file_ind, cbParam.sampcycle, cbParam.n_reactors)
     temp = []
     for j in range(cbParam.n_reactors):
         temp += list(set(cbData.temp_sp[j]))
@@ -105,59 +157,12 @@ if __name__ == "__main__":
 
 
     ### Explicit production rate estimation
-    temp_sp = []
-    gr = []
-    for j in range(cbParam.n_reactors):
-        time_h_list = []
-        od_list = []
-        dfl_list = []
-        dp_mat = []
-        dfl_mat = []
-        temp_sp_list = []
-        time_h = []
-        gr_fit = []
-        diluted = False
-        gr_constant = True
-        time_beg = 0
-        for i in range(len(cbData.time[j])):
-            if cbData.temp_sp[j][i] != cbData.temp_sp[j][max(0,i-1)]:
-                gr_constant = False
-                time_beg = cbData.time_h[j][i]
-            if cbData.time_h[j][i] - time_beg > 2 and not gr_constant:
-                gr_constant = True
-            if cbData.dil[j][i] and not cbData.dil[j][max(0,i-1)]:
-                dfl_list.append(e[j][i] - cbData.od[j][i]*parameters['od_fac'])
-                od_list.append(cbData.od[j][i])
-                time_h_list.append(cbData.time_h[j][i])
-                if diluted and gr_constant: # don't get gradient before first dilution, after temperature change
-                    p_ln_fit = np.polyfit(time_h_list-time_h_list[0], np.log(od_list), 1, w = np.sqrt(od_list)) # fit exponential, adjusted weight to account for transformation
-                    mu = p_ln_fit[0]
-                    p0 = np.exp(p_ln_fit[1])
-                    dp_list = p0/mu*(np.exp(mu*np.array(time_h_list-time_h_list[0]))-1)# integrate exp
-                    dfl_mat.append(dfl_list)
-                    dp_mat.append(np.array(dp_list))
-                    temp_sp_list.append(cbData.temp_sp[j][i])
-                diluted = True
-                dfl_list = []
-                time_h_list = []
-                od_list = []
-            if gr_constant and not cbData.dil[j][i]:
-                dfl_list.append(e[j][i] - cbData.od[j][i]*parameters['od_fac'])
-                od_list.append(cbData.od[j][i])
-                time_h_list.append(cbData.time_h[j][i])
-        # Fit lines and get growth rates
-        for r in range(len(temp_sp_list)):
-            if len(dfl_mat[r]) > 5:
-                gr.append(np.polyfit(dp_mat[r],dfl_mat[r],1)[0])
-                temp_sp.append(temp_sp_list[r])
-    # Sort gr according to temperature
-    grs = [[] for t in range(len(temp_lst))]
-    for r in range(len(temp_sp)):
-        grs[temp_lst.index(temp_sp[r])].append(gr[r])
-    boxdata = grs
-    median = [np.median(grs[t]) for t in range(len(grs))]
-    mean = [np.mean(grs[t]) for t in range(len(grs))]
-    std = [np.std(grs[t]) for t in range(len(grs))]
+    prs = get_prs(cbData, cbParam, temp_lst, parameters, e)
+
+    boxdata = prs
+    median = [np.median(prs[t]) for t in range(len(prs))]
+    mean = [np.mean(prs[t]) for t in range(len(prs))]
+    std = [np.std(prs[t]) for t in range(len(prs))]
     print("Explicit Production Rates:")
     print(*mean, sep = ", ")
     bp = gr_ax.boxplot(boxdata, positions=temp_lst, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
@@ -172,13 +177,18 @@ if __name__ == "__main__":
         patch.set_facecolor((0,0,0,0))
 
     ### Plot both production rate estimates
-    gr_model2_all = np.poly1d(np.polyfit(temp_lst[:-1], mean[:-1], 2, w = 1/np.array(std[:-1])))
+    gr_model2 = np.poly1d(np.polyfit(np.array(temp_lst[:-1])-32.5, mean[:-1], 2, w = 1/np.array(std[:-1])))
+    gr_model4 = np.poly1d(np.polyfit(np.array(temp_lst)-32.5, mean, 4, w = 1/np.array(std)))
     print("Production rate model:")
-    model_coeff = np.round(gr_model2_all.coefficients, 5)
+    model_coeff = np.round(gr_model2.coefficients, 5)
     print(*model_coeff, sep = ", ")
+    print(*gr_model4.coefficients, sep = ", ")
+    print(median[-1])
     x_mod = np.linspace(29, 36, 110)
-    y_all = np.maximum(gr_model2_all(x_mod),median[-1])
-    gr_ax.plot(x_mod, y_all, '-', color = '#0000FF', label = '2nd order poly fit')
+    y2 = np.maximum(gr_model2(x_mod-32.5),median[-1])
+    y4 = np.maximum(gr_model4(x_mod-32.5),median[-1])
+    gr_ax.plot(x_mod, y2, '-', color = '#0000FF', label = '2nd order poly fit')
+    gr_ax.plot(x_mod, y4, '-.', color = '#0000FF', label = '4th order poly fit')
 
     gr_ax.set_xlabel('Temperature [°C]')
     gr_ax.set_ylabel('Production Rate [1/h]')
@@ -196,6 +206,7 @@ if __name__ == "__main__":
         sim_fp = simulateFlProtein(cbData.time_h[j], fp_init[j], cbData.od[j], cbData.dil[j], cbData.temp[j], parameters).T
         sim_e_test.append(sim_fp + e_ofs[j] + parameters['od_fac']*cbData.od[j])
     
+
     # ANALYSIS
     n_rows = math.ceil(cbParam.n_reactors/2)
     n_culumns = 2 if cbParam.n_reactors > 1 else 1

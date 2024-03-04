@@ -68,11 +68,13 @@ class EKF:
         }
         self.var = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
 
-    def set_r_coeff(self, m0_key):
-        e_ofs_lst = list(self.model.parameters['e_ofs'].values())
-        e_fac_lst = list(self.model.parameters['e_fac'].values())
-        self.e_ofs = e_ofs_lst[list(self.model.parameters['e_ofs'].keys()).index(m0_key) + self.dev_ind]
-        self.e_fac = e_fac_lst[list(self.model.parameters['e_fac'].keys()).index(m0_key) + self.dev_ind]
+    def set_r_coeff(self, m_key):
+        # e_ofs_lst = list(self.model.parameters['e_ofs'].values())
+        # e_fac_lst = list(self.model.parameters['e_fac'].values())
+        # self.e_ofs = e_ofs_lst[list(self.model.parameters['e_ofs'].keys()).index(m0_key)]
+        # self.e_fac = e_fac_lst[list(self.model.parameters['e_fac'].keys()).index(m0_key)]
+        self.e_ofs = self.model.parameters['e_ofs'][m_key]
+        self.e_fac = self.model.parameters['e_fac'][m_key]
 
     def estimate(self, time: float, u: np.ndarray, y: np.ndarray = np.zeros(0)):
         """
@@ -89,7 +91,7 @@ class EKF:
             Will be ignored when update set to False.
 
         Returns
-        -------
+        ----------
         None
         """
 
@@ -113,7 +115,7 @@ class EKF:
             self.p_est_fl_res = 0
             temp_avg = 0
             if u[1]:
-                if not self.u_prev[1] and len(self.temp_lst) > 4: # TODO: Discard if time too long
+                if not self.u_prev[1] and len(self.temp_lst) > 4: # Require at least 5 measurements to minimize noise fitting
                     # calculate self.p_est_od and self.p_est_fl just before dilution
                     temp_avg = np.mean(self.temp_lst[:-1], axis = 0) # exclude current temp
                     gr = self.model.getGrowthRates(temp_avg)
@@ -123,18 +125,22 @@ class EKF:
                     b_od = self.od_lst - self.od_lst[-1]*np.exp(gr[0]*self.time_lst)
                     [self.p_est_od], [self.p_est_od_res] = np.linalg.lstsq(A_od, b_od, rcond = None)[0:2]
                     self.p_est_od_res = np.sqrt(self.p_est_od_res/len(self.od_lst))
-                    self.p_est_od = max(0, self.p_est_od)
-                    self.p_est_od = min(y[0], self.p_est_od)
+                    if self.p_est_od < 0:
+                        self.p_est_od = 0
+                    if self.p_est_od >= y[0]:
+                        self.p_est_od = 0
 
                     A_fl = np.vstack(gr[2]/gr[1]*(np.exp(gr[1]*self.time_lst) - 1))
                     b_fl = self.fp_lst - self.fp_lst[-1]
                     [self.p_est_fl], [self.p_est_fl_res] = np.linalg.lstsq(A_fl, b_fl, rcond = None)[0:2]
                     self.p_est_fl_res = np.sqrt(self.p_est_fl_res/len(self.fp_lst))
-                    self.p_est_fl = max(0, self.p_est_fl)
-                    self.p_est_fl = min(y[0], self.p_est_fl)
+                    if self.p_est_fl < 0:
+                        self.p_est_fl = 0
+                    if self.p_est_fl >= y[0]:
+                        self.p_est_fl = 0
                 self.time_lst, self.temp_lst, self.od_lst, self.fp_lst = [], [], [], []
-            if abs(self.est['e'] + self.est['p'] - y[0]) > 0.1:
-                print('WARNING: no od measurement update [{}] [{}:{}]'.format(self.dev_ind, math.floor(time/3600), math.floor((time/3600-math.floor(time/3600))*60)))
+            if abs(self.est['e'] + self.est['p'] - y[0]) > 0.3:
+                print('WARNING: od measurement far away from estimation [{}] [{}:{}]'.format(self.dev_ind, math.floor(time/3600), math.floor((time/3600-math.floor(time/3600))*60)))
             self.est, self.var = self.model.update(self.est, self.var, y, self.p_est_od, self.p_est_fl, self.p_est_od_res, self.p_est_fl_res, temp_avg)
 
         self.time_prev = time
