@@ -3,9 +3,9 @@ import numpy as np
 class Params:
     def __init__(self):
         self.default = {
-            'temp_pre_e' : 33,
-            'temp_pre_p' : 33,
-            'crit_temp' : 33.26, # around this temperature both bacteria should be growing at the same rate
+            'temp_pre_e' : 24,
+            'temp_pre_p' : 24,
+            'crit_temp' : 33.2, # around this temperature both bacteria should be growing at the same rate
 
             'od_setpoint' : 0.5,
             'dil_rate' : 0.048, # 1/cycle
@@ -13,7 +13,7 @@ class Params:
             'ts' : 1, # seconds
 
             'avg_temp' : True,
-            'lp_ht' : [1/60,1,45/60], # IIR Filter halftime in h for temperature delay of [e,p,fp] production
+            'lp_ht' : [2/60,1], # IIR Filter halftime in h for temperature delay of [e,p] production
             'min_fl' : [0.037, 0.064, 0.057, 0.058, 0.036, 0.068, 0.064, 0.061],
             'max_fl' : [0.280, 0.408, 0.355, 0.375, 0.323, 0.391, 0.297, 0.310],
             # 'fl_ofs' : [0.06681171028640953, 0.10124284006186575, 0.012420329020951698, 0.09948044745557398, 0.08938092574497708, 0.11260643351414071, 0.05869055434532918, 0.048870744085821975],
@@ -24,7 +24,7 @@ class Params:
 
             ### Growth rate parameters
             # Linear line fitting to 075_1 data
-            'gr_e' : [0.07727, -1.67954],
+            'gr_e' : [0.07727, -1.67954 + 0.01],
 
             # Quadratic line fitting to 075_1 data
             'gr_p' : [-0.02208, 1.3796, -20.56996],
@@ -41,9 +41,9 @@ class Params:
             # 'fp_init' : 0.056, # initial belief of fluorescence
             'fp_init' : 620, # initial belief of fluorescence
 
-            'sigma_e_init' : 0.2,
-            'sigma_p_init' : 0.2,
-            'sigma_fp_init' : 200, # 0.07
+            'sigma_e_init' : 0.1,
+            'sigma_p_init' : 0.1,
+            'sigma_fp_init' : 200,
 
             # Process noise standard deviation
             'sigma_e_dil' : 1e-2,
@@ -65,18 +65,20 @@ class Params:
             'fl_gr_update' : True,
 
             # Measurement noise standard deviation
+            # 'sigma_od' : 1e-2,
+            'sigma_od_mod' : 1e-2,
             'sigma_od' : 3e-2,
             'sigma_fl' :2e1,
+            'fl_temp2_prox_sigma_max': 1e2,
             'sigma_od_gr' : 3e-2,
-            'sigma_fl_gr' : 4e-2,
-            'od_gr_res_to_sigma' : 0.001, #this lstsq residual corresponds to an putida estimation error usually smaller than of 0.05 (approximated from the simulation)
+            'sigma_fl_gr' : 2e-2,
+            'gr_res_sigma' : 1, #this lstsq residual corresponds to an putida estimation error usually smaller than of 0.05 (approximated from the simulation)
             'od_gr_prox_sigma_max' : 0.4, #this is the maximum value the uncertainty gets increased through proximity of both growth rates
-            'od_gr_prox_sigma_decay' : 0.04, #at 0.05 growth rate difference the growth rate uncertainty is 1/e of the maximum growth rate uncertainty
-            'fl_gr_res_to_sigma' : 7, #this lstsq residual corresponds to an putida estimation error usually smaller than of 0.05 (approximated from the simulation)
-            'fl_gr_temp_prox_sigma_max' : 0.2, #this is the maximum value the uncertainty gets increased through proximity to 35.5 degrees
+            'od_gr_prox_sigma_decay' : 0.05, #at 0.05 growth rate difference the growth rate uncertainty is 1/e of the maximum growth rate uncertainty
+            'fl_gr_temp_prox_sigma_max' : 0.4, #this is the maximum value the uncertainty gets increased through proximity to 35.5 degrees
             'fl_gr_temp_sigma_decay' : 0.7, #at 1 degree from the max temperature the temp uncertainty is approx 1/10th of the maximum temp uncertainty
-            'fl_gr_temp2_prox_sigma_max' : 0.1, #this is the maximum value the uncertainty gets increased through proximity to 29 degrees
-            'fl_gr_temp2_sigma_decay' : 0.5, #at 0.5 degree from the max temperature the temp uncertainty is approx 1/e of the maximum temp uncertainty
+            'fl_gr_temp2_prox_sigma_max' : 0.7, #this is the maximum value the uncertainty gets increased through proximity to 29 degrees
+            'fl_gr_temp2_sigma_decay' : 1.0, #at 0.5 degree from the max temperature the temp uncertainty is approx 1/e of the maximum temp uncertainty
 
 
             ### Parameters for the Controller
