@@ -12,8 +12,13 @@ class CustModel:
 
         self.ts = self.parameters['ts']
         self.ts_h = self.ts/3600
-        self.temps = np.array([self.parameters['temp_pre_e'],self.parameters['temp_pre_p'],self.parameters['temp_pre_p']],dtype='float')
+        self.gr = np.array([self.getSteadyStateGrowthRates(self.parameters['temp_pre_e'])[0],
+                            self.getSteadyStateGrowthRates(self.parameters['temp_pre_p'])[1],
+                            self.getSteadyStateGrowthRates(self.parameters['temp_pre_p'])[2]])
         self.lp_fac = np.exp(-self.ts_h/np.array(self.parameters['lp_ht']))
+        gr_fp_delay_min = 30
+        self.gr_fp_k = self.ts_h *1.6 # 2
+        self.gr_fp_delayed = np.full(60*gr_fp_delay_min, self.gr[2], dtype=float)
 
         self.Q = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
         self.Q_dil = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
@@ -83,27 +88,25 @@ class CustModel:
             x_pred, p_pred = self.dilute(x_prev, p_prev)
 
         # Approximate abundance and their varaince after dt seconds of growth
-        temp = np.full(3,u[0],dtype='float')
+        gr_ss = self.getSteadyStateGrowthRates(u[0])
         for i in range(round(dt/self.ts)):
-            # Get delayed temperature values
-            self.temps = self.lp_fac*self.temps + (1-self.lp_fac)*temp
             # Get growth rates
-            gr = self.getGrowthRates(self.temps)
+            self.updateGrowthRates(gr_ss)
             # Jacobian of growth model
-            A = np.array([[1 + self.ts_h*gr[0], 0, 0],
-                      [0, 1 + self.ts_h*gr[1], 0],
-                      [0, self.ts_h*gr[2], 1]])
+            A = np.array([[1 + self.ts_h*self.gr[0], 0, 0],
+                      [0, 1 + self.ts_h*self.gr[1], 0],
+                      [0, self.ts_h*self.gr[2], 1]])
             self.L = np.diag([self.ts_h*x_pred[0], self.ts_h*x_pred[1], self.ts_h*x_pred[1]])
 
             # Abundance after Ts seconds
             # Euler forward (not significantly less accurate than Runge - Kutta 4th order)
-            x_pred = x_pred + self.ts_h*gr*np.array([x_pred[0], x_pred[1], x_pred[1]])
+            x_pred = x_pred + self.ts_h*self.gr*np.array([x_pred[0], x_pred[1], x_pred[1]])
 
             p_pred = A @ p_pred @ A.T + self.L @ self.Q @ self.L.T
 
         return dict(zip(x_prev_dic, x_pred)), p_pred
     
-    def update(self, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray, p_est_od: float, p_est_fl: float, p_est_od_res: float, p_est_fl_res, temp_avg: np.ndarray) -> Tuple[dict, np.ndarray]:
+    def update(self, x_pred_dic: dict, p_pred: np.ndarray, y: np.ndarray, p_est_od: float, p_est_fl: float, p_est_od_res: float, p_est_fl_res, gr_avg: np.ndarray, temp: float) -> Tuple[dict, np.ndarray]:
         '''
         Update Step
 
@@ -134,17 +137,22 @@ class CustModel:
             H = np.reshape(np.append(H, [self.parameters['od_fac'], self.parameters['od_fac'], 1]),(-1,3)) # [-x_pred[2]/(od+self.parameters['od_ofs'])**2, -x_pred[2]/(od+self.parameters['od_ofs'])**2, 1/(od+self.parameters['od_ofs'])]
             y_est = np.append(y_est, x_pred[2] + self.parameters['od_fac']*od) # x_pred[2]/(od+self.parameters['od_ofs']) + self.parameters['fl_ofs'][r_ind]
             y_new = np.append(y_new, y[1])
-            R = np.diag(np.append(np.diag(R), [self.parameters['sigma_fl']**2]))
+            R = np.diag(np.append(np.diag(R), [(self.parameters['sigma_fl']
+                                               + np.exp(-abs(temp - 29.5)/self.parameters['fl_gr_temp2_sigma_decay'])*self.parameters['fl_temp2_prox_sigma_max'])
+                                               **2]))
             m += 1
         if p_est_od and self.parameters['od_gr_update']:
             H = np.reshape(np.append(H, [[1, 0, 0], [0, 1, 0]]),(-1,3))
             y_est = np.append(y_est, [x_pred[0], x_pred[1]])
             y_new = np.append(y_new, [y[0] - p_est_od, p_est_od])
             # Increase the variance of the measurement according to the residual of the lsq solution and the proximity of both growth rates
-            gr = self.getGrowthRates(temp_avg)
             R = np.diag(np.append(np.diag(R),
-                                  [(self.parameters['sigma_od_gr'] + p_est_od_res/self.parameters['od_gr_res_to_sigma']*0.05 + np.exp(-abs(gr[1] - gr[0])/self.parameters['od_gr_prox_sigma_decay'])*self.parameters['od_gr_prox_sigma_max'])**2,
-                                   (self.parameters['sigma_od_gr'] + p_est_od_res/self.parameters['od_gr_res_to_sigma']*0.05 + np.exp(-abs(gr[1] - gr[0])/self.parameters['od_gr_prox_sigma_decay'])*self.parameters['od_gr_prox_sigma_max'])**2]))
+                                  [(self.parameters['sigma_od_gr']
+                                    + p_est_od_res*self.parameters['gr_res_sigma']*x_pred[0]
+                                    + np.exp(-abs(gr_avg[1] - gr_avg[0])/self.parameters['od_gr_prox_sigma_decay'])*self.parameters['od_gr_prox_sigma_max'])**2,
+                                   (self.parameters['sigma_od_gr']
+                                    + p_est_od_res*self.parameters['gr_res_sigma']*x_pred[1]
+                                    + np.exp(-abs(gr_avg[1] - gr_avg[0])/self.parameters['od_gr_prox_sigma_decay'])*self.parameters['od_gr_prox_sigma_max'])**2]))
             m += 2
         if p_est_fl and self.parameters['fl_gr_update']:
             H = np.reshape(np.append(H, [0, 1, 0]),(-1,3))
@@ -152,9 +160,10 @@ class CustModel:
             y_new = np.append(y_new, p_est_fl)
             # Increase the variance of the measurement according to the residual of the lsq solution and the proximity of 35ºC (strong change in production rate)
             R = np.diag(np.append(np.diag(R), (self.parameters['sigma_fl_gr']
-                                               + p_est_fl_res/self.parameters['fl_gr_res_to_sigma']*0.05
-                                               + np.exp(-abs(temp_avg[2] - 35.5)/self.parameters['fl_gr_temp_sigma_decay'])*self.parameters['fl_gr_temp_prox_sigma_max']
-                                               + np.exp(-abs(temp_avg[2] - 29)/self.parameters['fl_gr_temp2_sigma_decay'])*self.parameters['fl_gr_temp2_prox_sigma_max'])**2))
+                                               + p_est_fl_res*self.parameters['gr_res_sigma']*x_pred[1]
+                                               + np.exp(-abs(temp - 35.5)/self.parameters['fl_gr_temp_sigma_decay'])*self.parameters['fl_gr_temp_prox_sigma_max']
+                                               + np.exp(-abs(temp - 29)/self.parameters['fl_gr_temp2_sigma_decay'])*self.parameters['fl_gr_temp2_prox_sigma_max']
+                                               )**2))
             m += 1
         
         # K = np.linalg.solve(H @ p_pred.T @ H.T + self.M @ self.parameters['r'].T @ self.M.T, H @ p_pred.T).T
@@ -176,16 +185,29 @@ class CustModel:
 
         return dict(zip(x_pred_dic, xm)), Pm
     
-    def getGrowthRates(self, temp: np.ndarray) -> np.ndarray:
+    def getSteadyStateGrowthRates(self, temp: float) -> np.ndarray:
         """
-        Given the temperatures, return the corresponding growth rates
+        Given the current temperature, return the corresponding steady state growth and production rates
         """
-        gr_e = self.parameters['gr_e'][0]*temp[0] + self.parameters['gr_e'][1]
-        gr_p = self.parameters['gr_p'][0]*temp[1]**2 + self.parameters['gr_p'][1]*temp[1] + self.parameters['gr_p'][2]
-        # gr_f = self.parameters['gr_fp'][0]*temp[2]**2 + self.parameters['gr_fp'][1]*temp[2] + self.parameters['gr_fp'][2]
-        gr_f = 0
+        temp = min(36, temp)
+        temp = max(29, temp)
+        gr_e_ss = self.parameters['gr_e'][0]*temp + self.parameters['gr_e'][1]
+        gr_p_ss = self.parameters['gr_p'][0]*temp**2 + self.parameters['gr_p'][1]*temp + self.parameters['gr_p'][2]
+        pr_f_ss = 0
         for r in range(len(self.parameters['gr_fp'])):
-            gr_f += self.parameters['gr_fp'][r]*(temp[2]-32.5)**(len(self.parameters['gr_fp']) - 1 - r)
-        gr_f = max(self.parameters['min_gr_fp'],gr_f)
+            pr_f_ss += self.parameters['gr_fp'][r]*(temp-32.5)**(len(self.parameters['gr_fp']) - 1 - r)
+        pr_f_ss = max(self.parameters['min_gr_fp'],pr_f_ss)
 
-        return np.array([gr_e, gr_p, gr_f])
+        return np.array([gr_e_ss, gr_p_ss, pr_f_ss])
+
+    def updateGrowthRates(self, gr_ss: np.ndarray):
+        """
+        Filter the steady state steady state growth and production rates according to the dynamic model
+        """
+        # Low pass filter bacteria growth rates
+        self.gr[0:2] = self.lp_fac*self.gr[0:2] + (1-self.lp_fac)*gr_ss[0:2]
+
+        # Add damped oscillation to the production rate
+        self.gr[2] = self.gr[2] + self.gr_fp_k*(gr_ss[2] - self.gr_fp_delayed[0])
+        self.gr[2] = max(self.parameters['min_gr_fp'],self.gr[2])
+        self.gr_fp_delayed = np.append(self.gr_fp_delayed[1:],self.gr[2])

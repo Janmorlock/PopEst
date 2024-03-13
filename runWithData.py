@@ -20,7 +20,7 @@ class CritTemp:
 
     def f(self, xy):
         x, y = xy
-        gr = self.model.getGrowthRates(np.full(3,x))
+        gr = self.model.getSteadyStateGrowthRates(x)
         z = np.array([y - gr[0],
                     y - gr[1]])
         return z
@@ -29,12 +29,17 @@ class CritTemp:
         temp = fsolve(self.f, [33.0, 0.8])
         return temp[0]
 
+def moving_average(x, w):
+    return np.convolve(x, np.ones(w), 'valid') / w
+
 
 if __name__ == "__main__":
 
     # SPECIFY DATA
     data_name = '081-3'
     test_est = False
+    paper = False
+    control = True
     single_est = {'od_update':      [True, True, True],
                     'fl_update':    [True, False, False],
                     'od_gr_update': [False, True, False],
@@ -49,6 +54,7 @@ if __name__ == "__main__":
     cT = CritTemp()
     critTemp = cT.getCritTemp()
     assert(29 < critTemp and critTemp < 36)
+    print("Critical temperature: {}".format(critTemp))
 
     # dim = reactor, time, state
     estimates_pred = [np.empty((len_test,len(cbData.time[j])),dtype=dict) for j in range(cbParam.n_reactors)]
@@ -56,18 +62,20 @@ if __name__ == "__main__":
     variances = [np.empty((len_test,len(cbData.time[j]),3,3)) for j in range(cbParam.n_reactors)]
     pp_rel_od_arr = [np.empty((len_test,len(cbData.time[j]))) for j in range(cbParam.n_reactors)]
     pp_rel_fl_arr = [np.empty((len_test,len(cbData.time[j]))) for j in range(cbParam.n_reactors)]
+    pp_rel_od_res_arr = [np.empty((len_test,len(cbData.time[j]))) for j in range(cbParam.n_reactors)]
+    pp_rel_fl_res_arr = [np.empty((len_test,len(cbData.time[j]))) for j in range(cbParam.n_reactors)]
     for j in range(cbParam.n_reactors):
         for t in range(len_test):
             # Construct State estimator
             est_pred = EKF(dev_ind = j, update = False)
-            est = EKF(dev_ind = j)
-            est.model.dithered = bool(cbData.dil)
+            ekf = EKF(dev_ind = j)
+            ekf.model.dithered = bool(cbData.dil)
             if test_est:
-                est.model.parameters['od_update'] = single_est['od_update'][t]
-                est.model.parameters['fl_update'] = single_est['fl_update'][t]
-                est.model.parameters['od_gr_update'] = single_est['od_gr_update'][t]
-                est.model.parameters['fl_gr_update'] = single_est['fl_gr_update'][t]
-            est.set_r_coeff(cbParam.reactors[j])
+                ekf.model.parameters['od_update'] = single_est['od_update'][t]
+                ekf.model.parameters['fl_update'] = single_est['fl_update'][t]
+                ekf.model.parameters['od_gr_update'] = single_est['od_gr_update'][t]
+                ekf.model.parameters['fl_gr_update'] = single_est['fl_gr_update'][t]
+            ekf.set_r_coeff(cbParam.reactors[j])
             for k in range(len(cbData.time[j])):
                 # Run the filter
                 dil = cbData.dil[j][k] if cbData.dil else 0
@@ -76,11 +84,13 @@ if __name__ == "__main__":
                 estimates_pred[j][t,k] = est_pred.est.copy()
                 u = np.array([cbData.temp[j][k], dil])
                 y = np.array([cbData.od[j][k], cbData.fl[j][k]*cbData.b1[j][k]])
-                est.estimate(cbData.time[j][k], u, y)
-                estimates[j][t,k] = est.est.copy()
-                variances[j][t,k] = est.var.copy()
-                pp_rel_od_arr[j][t,k] = est.p_est_od/cbData.od[j][k]
-                pp_rel_fl_arr[j][t,k] = est.p_est_fl/cbData.od[j][k]
+                ekf.estimate(cbData.time[j][k], u, y)
+                estimates[j][t,k] = ekf.est.copy()
+                variances[j][t,k] = ekf.var.copy()
+                pp_rel_od_arr[j][t,k] = ekf.p_est_od/cbData.od[j][k]
+                pp_rel_fl_arr[j][t,k] = ekf.p_est_fl/cbData.od[j][k]
+                pp_rel_od_res_arr[j][t,k] = ekf.p_est_od_res
+                pp_rel_fl_res_arr[j][t,k] = ekf.p_est_fl_res
 
                 if k == len(cbData.time[j])-1:
                     print("Final variance [{}][{}]: {}".format(j, t, variances[j][t,k]))
@@ -94,11 +104,15 @@ if __name__ == "__main__":
     n_rows = cbParam.n_reactors
     n_culumns = len_test
     matplotlib.style.use('default')
+    # Set font to Times New Roman
     plt.rcParams['font.family'] = 'Times New Roman'
     fig, ax = plt.subplots(n_rows,n_culumns,sharey='all')
-    # Set font to Times New Roman
-    fig.set_figheight(n_rows*7)
-    fig.set_figwidth(n_culumns*10)
+    if paper:
+        fig.set_figheight(n_rows*5)
+        fig.set_figwidth(n_culumns*7)
+    else:
+        fig.set_figheight(n_rows*7)
+        fig.set_figwidth(n_culumns*10)
     if n_culumns == 1:
         if n_rows == 1:
             ax = [ax]
@@ -134,29 +148,39 @@ if __name__ == "__main__":
             ax[r][c].patch.set_visible(False)
 
             axr.hlines(critTemp,cbData.time_h[j][0]-1,cbData.time_h[j][-1]+1,'r',lw=0.5,alpha=0.5)
-            axr.plot(cbData.time_h[j],cbData.temp_sp[j],'--r',lw=0.5,alpha=0.5, label = '$temp_{sp}$')
+            if not paper:
+                axr.plot(cbData.time_h[j],cbData.temp_sp[j],'--r',lw=0.5,alpha=0.5, label = '$temp_{sp}$')
             axr.plot(cbData.time_h[j],cbData.temp[j],'r',lw=0.5,alpha=0.5, label = '$temp_{meas}$')
 
-            ax[r][c].plot(cbData.time_h[j],e[j]/max_e,'.', color = '#0000ff',markersize = 0.5,label = '$fl_{meas}$')
-            # ax[r][c].plot(cbData.time_h[j],(fp_pred + parameters['od_fac']*od_pred + parameters['e_ofs'][cbParam.reactors[j]])/max_e,'--',color='#0000ff',lw = 0.5, label = '$fl_{pred}$')
-            ax[r][c].plot(cbData.time_h[j],(fp + parameters['od_fac']*od + parameters['e_ofs'][cbParam.reactors[j]])/max_e,color = '#0000ff',lw = 0.5, label = '$fl_{est}$')
-            ax[r][c].plot(cbData.time_h[j],cbData.od[j],'.k',markersize = 0.5, alpha = 0.5, label = '$od_{meas}$')
-            ax[r][c].plot(cbData.time_h[j],od,'k',lw = 0.5, alpha = 0.5, label = '$od_{est}$')
-            ax[r][c].plot(cbData.time_h[j][pp_rel_od_arr[j][t] > 0],pp_rel_od_arr[j][t,pp_rel_od_arr[j][t] > 0],'+g',markersize = 6, alpha = 0.7, label = '$pp_{od}$')
-            ax[r][c].plot(cbData.time_h[j][pp_rel_fl_arr[j][t] > 0],pp_rel_fl_arr[j][t,pp_rel_fl_arr[j][t] > 0],'+',color = '#0000FF',markersize = 6, alpha = 0.7, label = '$pp_{fl}$')
+            ax[r][c].fill_between(cbData.time_h[j], p_puti_percent-p_puti_per_sigma, p_puti_percent+p_puti_per_sigma, color='g',alpha=0.1)
 
-            # ax[r][c].fill_between(cbData.time_h[j], p_puti_percent-p_puti_per_sigma, p_puti_percent+p_puti_per_sigma, color='g',alpha=0.2)
+            if not paper:
+                ax[r][c].plot(cbData.time_h[j],e[j]/max_e,'.', color = '#0000ff',markersize = 0.5,label = '$fl_{meas}$')
+                # ax[r][c].plot(cbData.time_h[j],(fp + parameters['od_fac']*od + parameters['e_ofs'][cbParam.reactors[j]])/max_e,color = '#0000ff',lw = 0.5, label = '$fl_{est}$')
+                ax[r][c].plot(cbData.time_h[j],cbData.od[j],'.k',markersize = 0.5, alpha = 0.5, label = '$od_{meas}$')
+                # ax[r][c].plot(cbData.time_h[j],od,'k',lw = 0.5, alpha = 0.5, label = '$od_{est}$')
+            # ax[r][c].plot(cbData.time_h[j][pp_rel_od_arr[j][t] > 0],pp_rel_od_arr[j][t,pp_rel_od_arr[j][t] > 0],'+g',markersize = 6, alpha = 0.7, label = '$pp_{od}$')
+            ax[r][c].plot(cbData.time_h[j][pp_rel_od_arr[j][t] > 0][1:-1],moving_average(pp_rel_od_arr[j][t,pp_rel_od_arr[j][t] > 0],3),'--',color = 'k',lw = 0.6, alpha = 1, label = '$\hat{p}_{od}$')
+            # ax[r][c].plot(cbData.time_h[j][pp_rel_fl_arr[j][t] > 0],pp_rel_fl_arr[j][t,pp_rel_fl_arr[j][t] > 0],'+',color = '#0000FF',markersize = 6, alpha = 0.7, label = '$pp_{fl}$')
+            ax[r][c].plot(cbData.time_h[j][pp_rel_fl_arr[j][t] > 0][1:-1],moving_average(pp_rel_fl_arr[j][t,pp_rel_fl_arr[j][t] > 0],3),'--',color = '#0000FF',lw = 0.6, alpha = 1, label = '$\hat{p}_{fl}$')
+            # ax[r][c].plot(cbData.time_h[j][pp_rel_od_res_arr[j][t] > 0],pp_rel_od_res_arr[j][t,pp_rel_od_res_arr[j][t] > 0]/max(pp_rel_od_res_arr[j][t]), '+g', markersize = 7, label = '$pp_{res,od}$')
+            # ax[r][c].plot(cbData.time_h[j][pp_rel_fl_res_arr[j][t] > 0],pp_rel_fl_res_arr[j][t,pp_rel_fl_res_arr[j][t] > 0]/max(pp_rel_fl_res_arr[j][t]), '+b', markersize = 7, label = '$pp_{res,fl}$')
+        
             # ax[r][c].plot(cbData.time_h[j],(cbData.fl[j]-parameters['min_fl'][j])/(parameters['max_e'][j]-parameters['min_fl'][j]),'.g',markersize = 0.8, alpha = 0.5, label = '$puti_{est,old}$')
-            ax[r][c].plot(cbData.time_h[j],p_puti_pred_percent, 'g', lw = 0.5, label = '$pp_{pred}$')
-            ax[r][c].plot(cbData.time_h[j][cbData.p_targ[j] > 0],cbData.p_targ[j][cbData.p_targ[j] > 0], '--g', lw = 1, label = '$pp_{targ}$')
-            ax[r][c].plot(cbData.time_h[j],cbData.p_est[j], 'g', linestyle = 'dashdot', lw = 1.4, label = '$pp_{est,live}$')
-            ax[r][c].plot(cbData.time_h[j],p_puti_percent, 'g', lw = 1.4, label = '$pp_{est}$')
-            ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],1-cbParam.cb_fc_ec[j]/100, 'gx', markersize = 10, label = '$pp_{fc}$')
+            ax[r][c].plot(cbData.time_h[j],p_puti_pred_percent, 'g', lw = 0.5, label = '$\hat{p}_{pred}$')
+            if control:
+                ax[r][c].plot(cbData.time_h[j][cbData.p_targ[j] > 0],cbData.p_targ[j][cbData.p_targ[j] > 0], '--g', lw = 1, label = '$p_{targ}$')
+                ax[r][c].plot(cbData.time_h[j],cbData.p_est[j], 'g', linestyle = 'dashdot', lw = 1.4, label = '$\hat{p}_{live}$')
+            ax[r][c].plot(cbData.time_h[j],p_puti_percent, 'g', lw = 1.4, label = '$\hat{p}$')
+            # ax[r][c].plot(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],1-cbParam.cb_fc_ec[j]/100, 'gx', markersize = 10, label = '$pp_{fc}$')
+            fc_std = 5.3/100
+            ax[r][c].errorbar(cbData.time_h[j][cbParam.sampcycle[j]-cbParam.sampcycle[j][0]],1-cbParam.cb_fc_ec[j]/100, yerr = fc_std*2, fmt = 'x', markersize = 10, color = 'g', capsize = 3, label = '$p_{fc}$ with $2 \sigma_{fc}$')
 
             ax[r][c].legend(loc="upper left")
-            axr.legend(loc="lower right")
+            if not paper:
+                axr.legend(loc="lower right")
             if c == 0:
-                ax[r][c].set_ylabel("Normalized abunance")
+                ax[r][c].set_ylabel("Relative Abundance")
             if c == n_culumns-1:
                 axr.set_ylabel('Temperature [°C]', color='r')
                 axr.set_yticks(np.append(axr.get_yticks(), critTemp))
@@ -181,10 +205,12 @@ if __name__ == "__main__":
             ax[r][c].set_xlim([cbData.time_h[j][0]-0.5,cbData.time_h[j][-1]+0.5])
             ax[r][c].set_ylim([0,1.05])
             axr.set_ylim([28,37])
-            ax[r][c].set_title(cbParam.titles[j])
+            if not paper:
+                ax[r][c].set_title(cbParam.titles[j])
 
             err[j,t] = abs(1-cbParam.cb_fc_ec[j]/100 - p_puti_percent[cbParam.sampcycle[j]-cbParam.sampcycle[j][0]])
-    fig.suptitle(data_name)
+    if not paper:
+        fig.suptitle(data_name)
     fig.tight_layout()
     
     hm, hm_ax = plt.subplots(n_plots, 1, figsize=(14, 10), sharey=True)
@@ -192,4 +218,7 @@ if __name__ == "__main__":
     results_dir = "Images/{}".format(data_name)
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    fig.savefig(results_dir+"/ekf_{}r{}_opt.png".format(cbParam.n_reactors, '_test_est' if test_est else ''),transparent=True)
+    if paper:
+        fig.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresCDC/5_estResults.pdf', transparent=True)
+    else:
+        fig.savefig(results_dir+"/ekf_{}r{}.png".format(cbParam.n_reactors, '_test_est' if test_est else ''),transparent=True)

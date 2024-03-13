@@ -8,7 +8,7 @@ class CbData:
         scope = cbParam.sampcycle
         cb_files = sorted(glob.glob(cbParam.path + "/*.csv"))
         cb_dfs = [[] for j in range(cbParam.n_reactors)]
-        for j in range(len(cbParam.file_ind)):
+        for j in range(cbParam.n_reactors):
             for i in range(len(cbParam.file_ind[j])):
                 df = pd.read_csv(cb_files[cbParam.file_ind[j][i]], index_col=None, header=0)
                 if i > 0:

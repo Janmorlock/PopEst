@@ -17,6 +17,7 @@ if __name__ == "__main__":
     batch_size = 8
     cbParam = CbDataParam(dataName)
     results_dir = "Images/{}".format(dataName)
+    paper = True
 
     cbData = CbData(cbParam)
     temps = []
@@ -37,7 +38,10 @@ if __name__ == "__main__":
     fig.set_figheight(n_rows*7)
     fig.set_figwidth(n_culumns*10)
     if n_culumns == 1:
-        ax = [ax]
+        if n_rows == 1:
+            ax = [ax]
+        else:
+            ax = [[ax[i]] for i in range(n_rows)]
     if n_rows == 1:
         ax = [ax]
     
@@ -188,9 +192,9 @@ if __name__ == "__main__":
 
     # Plot fit
     x = np.linspace(temps[0],temps[-1],100)
-    ax.plot(x, p_model(x), 'g', linewidth=2, label = 'ivw fit')
-    ax.plot(x, e_model(x), 'm', linewidth=2, label = 'ivw fit')
-    pr_ax.plot(x, np.maximum(pr_model4(x-32.5),media_fl[-1]), '#0000ff', linewidth=2, label = 'ivw fit')
+    ax.plot(x, p_model(x), 'g', linewidth=2)
+    ax.plot(x, e_model(x), 'm', linewidth=2)
+    pr_ax.plot(x, np.maximum(pr_model4(x-32.5),media_fl[-1]), '#0000ff', linewidth=2)
     # ax.vlines(critical_temp, 0, 1.4, lw = 1, colors='k', linestyles='dashed')
     xticks = list(set(np.int16(pr_ax.get_xticks())))# + [critical_temp]
     xticks_lb = ['29', '30', '31', '32', '33', '34', '35', '36']
@@ -202,11 +206,11 @@ if __name__ == "__main__":
     pr_ax.set_ylabel(r'Pyoverdine Production Rate $[\frac{1}{h}]$')
     h,l = ax.get_legend_handles_labels()
     h = [bp_p["boxes"][0], bp_e["boxes"][0], *h]
-    l = [r'$\it{P. putida}$', r'$\it{E. coli}$', *l]
+    l = [r'$\mu_{P,meas}$', r'$\mu_{E,meas}$', *l]
     ax.legend(h,l, loc='best')
     h,l = pr_ax.get_legend_handles_labels()
     h = [bp_fl["boxes"][0], *h]
-    l = [r'$\it{Pyoverdine}$', *l]
+    l = [r'$\mu_{F,meas}$', *l]
     pr_ax.legend(h,l, loc='best')
 
     # ax.set_title("Bacteria Growth Rates")
@@ -217,5 +221,7 @@ if __name__ == "__main__":
     # fig.tight_layout()
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    # fig.savefig(results_dir + "/odGradient.png", transparent=True)
-    fig_gr.savefig(results_dir + "/2_productionRates.pdf", transparent=True)
+    if paper:
+        fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresCDC/2_productionRates.pdf', transparent=True)
+    else:
+        fig.savefig(results_dir + "/odGradient.pdf", transparent=True)
