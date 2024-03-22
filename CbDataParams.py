@@ -218,6 +218,19 @@ class CbDataParam:
                 sampcycle = [sampcycle[i] - 1 for i in range(len(file_ind))] # adapts indeces to python
                 titles = ['C7M0','C7M1','C7M2','C7M3']
                 reactors = ['Faith', 'Allan', 'George', 'Tammy']
+            case '083-2':
+                path = '../../Ting/Experiments/083-2'
+                # Indeces of files of interest
+                file_ind = [4,5,6,7]
+                n_reactors = len(file_ind)
+                # Sampcycle indices as in Matlab
+                sampcycle = [np.array([1, 1369, 3018, 4407, 5820, 7305]),
+                            np.array([1, 1369, 3018, 4407, 5820, 7305]),
+                            np.array([1, 1369, 3018, 4407, 5820, 7305]),
+                            np.array([1, 1369, 3018, 4407, 5820, 7305])]
+                sampcycle = [sampcycle[i] - 1 for i in range(len(file_ind))] # adapts indeces to python
+                titles = ['C6M0','C6M1','C6M2','C6M3']
+                reactors = ['Faith', 'Arthur', 'George', 'Tammy']
             case _:
                 raise Exception('Data information of {} not given.'.format(dataName))
         
@@ -284,7 +297,14 @@ def getFcData(dataName):
                                 FC_data[5::4].to_numpy(),
                                 FC_data[6::4].to_numpy(),
                                 FC_data[7::4].to_numpy()])
+        case '083-2':
+            FC_file = pd.read_excel('../../Ting/Experiments/083-2/240319 Facility Analysis Manual Count.xlsx',header=[1])
+            FC_data = FC_file['% Parent.1'] + FC_file['% Parent.2']
+            cb_fc_ec = np.array([FC_data[8::8].to_numpy(),
+                                FC_data[9::8].to_numpy(),
+                                FC_data[10::8].to_numpy(),
+                                FC_data[11::8].to_numpy()])
         case _:
-            cb_fc_ec = np.array([])
+            cb_fc_ec = np.array([[]])
             print('cb_fc_ec information of {} not given.'.format(dataName))
     return cb_fc_ec

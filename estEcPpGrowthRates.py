@@ -30,8 +30,10 @@ if __name__ == "__main__":
     delay = [3, 0]
 
     matplotlib.style.use('default')
-    # matplotlib.rc('text', usetex=True)
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
     plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams.update({'font.size': 11})
     n_rows = math.ceil(cbParam.n_reactors/2)
     n_culumns = 2 if cbParam.n_reactors > 1 else 1
     fig, ax = plt.subplots(n_rows,2,sharex='all',sharey='all')
@@ -159,9 +161,9 @@ if __name__ == "__main__":
     media_fl = [np.median(prs[t]) for t in range(len(prs))]
     pr_model4 = np.poly1d(np.polyfit(np.array(temps)-32.5, mean_fl, 4, w = 1/np.array(std_fl)))
 
-    fig_gr, (ax, pr_ax) = plt.subplots(2,1)
-    plt.subplots_adjust(hspace=0.07)
-    fig_gr.set_figheight(7)
+    fig_gr, (ax, pr_ax) = plt.subplots(2,1,height_ratios=[3, 2],sharex='all')
+    plt.subplots_adjust(hspace=0.09)
+    fig_gr.set_figheight(6)
     fig_gr.set_figwidth(7)
     # Plot gradients
     bp_p = ax.boxplot(boxdata[0], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
@@ -192,30 +194,31 @@ if __name__ == "__main__":
 
     # Plot fit
     x = np.linspace(temps[0],temps[-1],100)
-    ax.plot(x, p_model(x), 'g', linewidth=2)
-    ax.plot(x, e_model(x), 'm', linewidth=2)
-    pr_ax.plot(x, np.maximum(pr_model4(x-32.5),media_fl[-1]), '#0000ff', linewidth=2)
+    ax.plot(x, p_model(x), 'g', linewidth=2, label = 'Polynomial Fit')
+    ax.plot(x, e_model(x), 'm', linewidth=2, label = 'Polynomial Fit')
+    pr_ax.plot(x, np.maximum(pr_model4(x-32.5),media_fl[-1]), '#0000ff', linewidth=2, label = 'Polynomial Fit')
     # ax.vlines(critical_temp, 0, 1.4, lw = 1, colors='k', linestyles='dashed')
     xticks = list(set(np.int16(pr_ax.get_xticks())))# + [critical_temp]
     xticks_lb = ['29', '30', '31', '32', '33', '34', '35', '36']
     xticks.sort()
-    ax.set_xticks([])
+    # ax.set_xticks([])
     pr_ax.set_xticks(xticks, labels=xticks_lb)
     ax.set_ylabel(r'Bacteria Growth Rate $[\frac{1}{h}]$')
     pr_ax.set_xlabel(r'Temperature $[^{\circ}C]$')
     pr_ax.set_ylabel(r'Pyoverdine Production Rate $[\frac{1}{h}]$')
     h,l = ax.get_legend_handles_labels()
     h = [bp_p["boxes"][0], bp_e["boxes"][0], *h]
-    l = [r'$\mu_{P,meas}$', r'$\mu_{E,meas}$', *l]
+    l = [r'P. putida, $\mu_{P,meas}$', r'E. coli, $\mu_{E,meas}$', *l]
     ax.legend(h,l, loc='best')
     h,l = pr_ax.get_legend_handles_labels()
     h = [bp_fl["boxes"][0], *h]
-    l = [r'$\mu_{F,meas}$', *l]
+    l = [r'Pyoverdine, $\mu_{F,meas}$', *l]
     pr_ax.legend(h,l, loc='best')
 
     # ax.set_title("Bacteria Growth Rates")
     ax.set_ylim([0,1.3])
     pr_ax.set_ylim([0,8000])
+    fig_gr.tight_layout()
     # Save figures
     fig.suptitle(dataName)
     # fig.tight_layout()

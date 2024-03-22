@@ -12,15 +12,15 @@ if __name__ == "__main__":
 
     # Simulation parameters
     pre_time_m = 60
-    timeEnd_m = 60 * 20
+    timeEnd_m = 60 * 17
     alpha_temp = 0.8
 
     od_th = 0.53
     od_l_th = 0.46
     dithered = True
-    noise = True
+    noise = False
     control = False
-    paper = False
+    paper = True
     test_var = '' # 'pid' or 'single_est' or 'combi_est'
     pid = [{'Kp': 15, 'Ki': 0, 'Kd': 0},
            {'Kp': 15, 'Ki': 0.01, 'Kd': 0},
@@ -57,8 +57,11 @@ if __name__ == "__main__":
     if paper:
         n_rows = 2
     matplotlib.style.use('default')
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
     plt.rcParams['font.family'] = 'Times New Roman'
-    fig, ax = plt.subplots(n_rows,n_culumns)
+    plt.rcParams.update({'font.size': 11})
+    fig, ax = plt.subplots(n_rows,n_culumns, height_ratios=[3, 2])
     if n_culumns == 1:
         if n_rows == 1:
             ax = [ax]
@@ -67,7 +70,7 @@ if __name__ == "__main__":
     if n_rows == 1:
         ax = [ax]
     if paper:
-        fig.set_figheight(n_rows*3)
+        fig.set_figheight(n_rows*2.5)
         fig.set_figwidth(n_culumns*7)
     else:
         fig.set_figheight(n_rows*7)
@@ -224,11 +227,11 @@ if __name__ == "__main__":
                         if abs(th_target - temp_target) > 0:
                             err_cum -= pp_rel_err * model_est.parameters['ki']
             else:
-                if time_h < 6:
+                if time_h < 4:
                     temp_target = 29
-                elif time_h < 10:
+                elif time_h < 8:
                     temp_target = 36
-                elif time_h < 14:
+                elif time_h < 12:
                     temp_target = 34
                 else:
                     temp_target = model_est.parameters['crit_temp']
@@ -255,32 +258,30 @@ if __name__ == "__main__":
         axr.plot(time_h_arr,temp_arr,'r',lw=1,alpha=1, label = '$temp_{meas}$')
 
         if not paper:
-            ax[r][c].plot(time_h_arr,od_arr, '.k', markersize = 0.5, label = '$od_{meas}$')
-            ax[r][c].plot(time_h_arr,fl_arr/max_fl, '.', color = '#0000FF', markersize =  0.5, label = '$em_{meas}$')
-        ax[r][c].plot(time_h_arr[pp_rel_od_arr > 0],pp_rel_od_arr[pp_rel_od_arr > 0], 'xk', markersize = 4, label = '$\hat{p}_{od}$')
-        ax[r][c].plot(time_h_arr[pp_rel_fl_arr > 0],pp_rel_fl_arr[pp_rel_fl_arr > 0], '+', color = '#0000FF', markersize = 4, label = '$\hat{p}_{fl}$')
+            ax[r][c].plot(time_h_arr,od_arr*100, '.k', markersize = 0.5, label = '$od_{meas}$')
+            ax[r][c].plot(time_h_arr,fl_arr/max_fl*100, '.', color = '#0000FF', markersize =  0.5, label = '$em_{meas}$')
+        ax[r][c].plot(time_h_arr,pp_rel_arr*100, '-g', lw = 2, label = 'Ground Truth, $p$')
+        ax[r][c].plot(time_h_arr[pp_rel_od_arr > 0],pp_rel_od_arr[pp_rel_od_arr > 0]*100, 'xk', markersize = 4, label = 'Est. through OD, $\hat{p}_{od}$')
+        ax[r][c].plot(time_h_arr[pp_rel_fl_arr > 0],pp_rel_fl_arr[pp_rel_fl_arr > 0]*100, '+', color = '#0000FF', markersize = 4, label = 'Est. through Fluorescence, $\hat{p}_{fl}$')
         if not paper:
-            ax[r][c].plot(time_h_arr,od_est_arr, 'k', lw = 0.5, label = '$\hat{od}$', alpha = 0.5)
-            ax[r][c].plot(time_h_arr,fl_est_arr/max_fl, color = '#0000FF', lw = 0.5, label = '$\hat{em}$', alpha = 0.5)
-        ax[r][c].plot(time_h_arr,pp_rel_arr, '-g', lw = 1.5, label = '$p$')
+            ax[r][c].plot(time_h_arr,od_est_arr*100, 'k', lw = 0.5, label = '$\hat{od}$', alpha = 0.5)
+            ax[r][c].plot(time_h_arr,fl_est_arr/max_fl*100, color = '#0000FF', lw = 0.5, label = '$\hat{em}$', alpha = 0.5)
         if control:
-            ax[r][c].plot(time_h_arr[pp_rel_target_arr >= 0],pp_rel_target_arr[pp_rel_target_arr >= 0], '--g', lw = 1.2, label = '$p_{target}$')
+            ax[r][c].plot(time_h_arr[pp_rel_target_arr >= 0],pp_rel_target_arr[pp_rel_target_arr >= 0]*100, '--g', lw = 1.2, label = '$p_{target}$')
         if noise:
-            ax[r][c].plot(time_h_arr,pp_rel_pred_arr, 'g', lw = 0.5, label = '$p_{pred}$')
-        ax[r][c].plot(time_h_arr,pp_rel_est_arr, 'g', lw = 1.2, label = '$\hat{p}$')
-        ax[r][c].plot(time_h_arr[pp_rel_od_res_arr > 0],pp_rel_od_res_arr[pp_rel_od_res_arr > 0], '.k', markersize = 4, label = '$r_{od}$')
-        ax[r][c].plot(time_h_arr[pp_rel_fl_res_arr > 0],pp_rel_fl_res_arr[pp_rel_fl_res_arr > 0], '.' , color = '#0000FF', markersize = 4, label = '$r_{fl}$')
+            ax[r][c].plot(time_h_arr,pp_rel_pred_arr*100, 'g', lw = 0.5, label = '$p_{pred}$')
+        if not paper:
+            ax[r][c].plot(time_h_arr,pp_rel_est_arr*100, 'g', lw = 1.2, label = '$\hat{p}$')
+            ax[r][c].plot(time_h_arr[pp_rel_od_res_arr > 0],pp_rel_od_res_arr[pp_rel_od_res_arr > 0]*100, '.k', markersize = 4, label = '$r_{od}$')
+            ax[r][c].plot(time_h_arr[pp_rel_fl_res_arr > 0],pp_rel_fl_res_arr[pp_rel_fl_res_arr > 0]*100, '.' , color = '#0000FF', markersize = 4, label = '$r_{fl}$')
 
-        ax[r][c].legend(loc="upper left")
         if c == 0:
-            ax[r][c].set_ylabel("Relative Abundance")
+            ax[r][c].set_ylabel("Relative P. putida Abundance [%]")
         if c == n_culumns-1:
             axr.set_ylabel('Temperature [°C]', color='r')
             yticks = np.array([28, 29, 30, 31, 32, model_sim.parameters['crit_temp'], 34, 35, 36, 37])
             axr.set_yticks(yticks, labels=yticks)
-            # axr.set_yticks(np.append(axr.get_yticks(), model_sim.parameters['crit_temp']))
             axr.tick_params(axis='y', color='r', labelcolor='r')
-            # ax[r][c].tick_params(axis='y', labelleft=True)
         else:
             axr.tick_params(axis='y', color='r', labelright=False)
         if paper:
@@ -288,7 +289,7 @@ if __name__ == "__main__":
         else:
             if r == n_rows-1:
                 ax[r][c].set_xlabel("Time [h]")
-        ax[r][c].set_ylim([0,1])
+        ax[r][c].set_ylim([0,100])
         axr.set_ylim([28,37])
         axr.set_xlim([-0.5,timeEnd_m/60+0.5])
         if not paper:
@@ -296,12 +297,27 @@ if __name__ == "__main__":
             ax[r][c].set_title(titles[j])
 
         if paper:
-            ax[1][0].scatter(np.log10(pp_rel_fl_res_arr[pp_rel_fl_arr > 0])*20,abs(pp_rel_fl_arr[pp_rel_fl_arr > 0]-pp_rel_arr[pp_rel_fl_arr > 0])/pp_rel_arr[pp_rel_fl_arr > 0]*100, color = '#0000FF', label = '$\hat{p}_{fl}$')
-            ax[1][0].scatter(np.log10(pp_rel_od_res_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] < 15])*20,abs(pp_rel_od_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] < 15]-pp_rel_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] < 15])/pp_rel_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] < 15]*100, color = 'k', label = '$\hat{p}_{od}[k<k_{15}]$')
-            ax[1][0].scatter(np.log10(pp_rel_od_res_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] > 15])*20,abs(pp_rel_od_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] > 15]-pp_rel_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] > 15])/pp_rel_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] > 15]*100, color = '#909090', label = '$\hat{p}_{od}[k>k_{15}]$')
+            ax[1][0].scatter(np.log10(pp_rel_fl_res_arr[pp_rel_fl_arr > 0])*20,abs(pp_rel_fl_arr[pp_rel_fl_arr > 0]-pp_rel_arr[pp_rel_fl_arr > 0])/pp_rel_arr[pp_rel_fl_arr > 0]*100, color = '#0000FF', label = 'Est. through Fluorescence, $\hat{p}_{fl}$')
+            ax[1][0].scatter(np.log10(pp_rel_od_res_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] < 13])*20,abs(pp_rel_od_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] < 13]-pp_rel_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] < 13])/pp_rel_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] < 13]*100, color = 'k', label = 'Est. through OD, $\hat{p}_{od}, \, t<13$')
+            ax[1][0].scatter(np.log10(pp_rel_od_res_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] > 13])*20,abs(pp_rel_od_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] > 13]-pp_rel_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] > 13])/pp_rel_arr[pp_rel_od_arr > 0][time_h_arr[pp_rel_od_arr > 0] > 13]*100, color = '#909090', label = 'Est. through OD, $\hat{p}_{od}, \, t>13$')
             ax[1][0].set_xlabel('Normalized Least Squares Residual [dB]')
             ax[1][0].set_ylabel('Relative Estimation Error [%]')
-            ax[1][0].legend()
+            ax[0][0].text(0.01, 0.98, 'A',
+                    horizontalalignment='left',
+                    verticalalignment='top',
+                    fontsize=26,
+                    transform=ax[0][0].transAxes,
+                    color='k',
+                    bbox={'facecolor': 'red', 'alpha': 0, 'pad': 0, 'edgecolor': 'k'})
+            ax[1][0].text(0.01, 0.98, 'B',
+                    horizontalalignment='left',
+                    verticalalignment='top',
+                    transform=ax[1][0].transAxes,
+                    fontsize=26,
+                    color='k',
+                    bbox={'facecolor': 'red', 'alpha': 0, 'pad': 0, 'edgecolor': 'k'})
+            ax[1][0].legend(loc = 'upper left', bbox_to_anchor=(0.09,1))
+        ax[r][c].legend()
         
     # Save figures
     dataName = "sim"
