@@ -18,9 +18,10 @@ if __name__ == "__main__":
     od_th = 0.53
     od_l_th = 0.46
     dithered = True
-    noise = False
+    noise = True
     control = False
     paper = True
+    pres = True
     test_var = '' # 'pid' or 'single_est' or 'combi_est'
     pid = [{'Kp': 15, 'Ki': 0, 'Kd': 0},
            {'Kp': 15, 'Ki': 0.01, 'Kd': 0},
@@ -53,15 +54,16 @@ if __name__ == "__main__":
         timeEnd_m += pre_time_m
 
     # Initialize plot
-    n_rows = 1
-    if paper:
-        n_rows = 2
     matplotlib.style.use('default')
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
     plt.rcParams['font.family'] = 'Times New Roman'
     plt.rcParams.update({'font.size': 11})
-    fig, ax = plt.subplots(n_rows,n_culumns, height_ratios=[3, 2])
+    n_rows = 1
+    fig, ax = plt.subplots(n_rows,n_culumns)
+    if paper:
+        n_rows = 2
+        fig, ax = plt.subplots(n_rows,n_culumns, height_ratios=[3, 2])
     if n_culumns == 1:
         if n_rows == 1:
             ax = [ax]
@@ -331,6 +333,9 @@ if __name__ == "__main__":
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
     if paper:
-        fig.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresCDC/2_estQuality.pdf', transparent=True)
+        if pres:
+            fig.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresPresentation/estQuality.pdf', transparent=True)
+        else:
+            fig.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresCDC/2_estQuality.pdf', transparent=True)
     else:
         fig.savefig(results_dir + "/sim{}{}{}.png".format('_control' if control else '', '_' + test_var if test_var else '', '_noise' if noise else ''), transparent=True)

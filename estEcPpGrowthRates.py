@@ -18,6 +18,7 @@ if __name__ == "__main__":
     cbParam = CbDataParam(dataName)
     results_dir = "Images/{}".format(dataName)
     paper = True
+    symbol = False
 
     cbData = CbData(cbParam)
     temps = []
@@ -162,62 +163,74 @@ if __name__ == "__main__":
     pr_model4 = np.poly1d(np.polyfit(np.array(temps)-32.5, mean_fl, 4, w = 1/np.array(std_fl)))
 
     fig_gr, (ax, pr_ax) = plt.subplots(2,1,height_ratios=[3, 2],sharex='all')
-    plt.subplots_adjust(hspace=0.09)
-    fig_gr.set_figheight(6)
-    fig_gr.set_figwidth(7)
-    # Plot gradients
-    bp_p = ax.boxplot(boxdata[0], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
-                meanprops=dict(markerfacecolor = 'g', markeredgecolor = 'g'),
-                boxprops=dict(color="g", alpha=0.5),
-                medianprops=dict(color="g", alpha=0.5),
-                flierprops=dict(markeredgecolor="g", alpha=0.5),
-                capprops=dict(color="g", alpha=0.5),
-                whiskerprops=dict(color="g", alpha=0.5))
-    bp_e = ax.boxplot(boxdata[1], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
-                meanprops=dict(markerfacecolor = 'm', markeredgecolor = 'm'),
-                boxprops=dict(color="m", alpha=0.5),
-                medianprops=dict(color="m", alpha=0.5),
-                flierprops=dict(markeredgecolor="m", alpha=0.5),
-                capprops=dict(color="m", alpha=0.5),
-                whiskerprops=dict(color="m", alpha=0.5))
-    bp_fl = pr_ax.boxplot(prs, positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
-                        meanprops=dict(markerfacecolor = '#0000ff', markeredgecolor = '#0000ff'),
-                        boxprops=dict(color = '#0000ff'),
-                        medianprops=dict(color = '#0000ff'),
-                        flierprops=dict(markeredgecolor = '#0000ff'),
-                        capprops=dict(color = '#0000ff'),
-                        whiskerprops=dict(color = '#0000ff'))
-    # fill with colors
-    for bp in [bp_p, bp_e, bp_fl]:
-        for patch in bp['boxes']:
-            patch.set_facecolor((1,1,1,0))
+    if symbol:
+        fig_gr, ax = plt.subplots(1,1,sharex='all')
+        fig_gr.set_figheight(1.5)
+        fig_gr.set_figwidth(1.5)
+    else:
+        plt.subplots_adjust(hspace=0.09) # 0.09
+        fig_gr.set_figheight(4) #6
+        fig_gr.set_figwidth(4) #7
+        # Plot gradients
+        bp_p = ax.boxplot(boxdata[0], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
+                    meanprops=dict(markerfacecolor = 'g', markeredgecolor = 'g'),
+                    boxprops=dict(color="g", alpha=0.5),
+                    medianprops=dict(color="g", alpha=0.5),
+                    flierprops=dict(markeredgecolor="g", alpha=0.5),
+                    capprops=dict(color="g", alpha=0.5),
+                    whiskerprops=dict(color="g", alpha=0.5))
+        bp_e = ax.boxplot(boxdata[1], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
+                    meanprops=dict(markerfacecolor = 'm', markeredgecolor = 'm'),
+                    boxprops=dict(color="m", alpha=0.5),
+                    medianprops=dict(color="m", alpha=0.5),
+                    flierprops=dict(markeredgecolor="m", alpha=0.5),
+                    capprops=dict(color="m", alpha=0.5),
+                    whiskerprops=dict(color="m", alpha=0.5))
+        bp_fl = pr_ax.boxplot(prs, positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
+                            meanprops=dict(markerfacecolor = '#0000ff', markeredgecolor = '#0000ff'),
+                            boxprops=dict(color = '#0000ff'),
+                            medianprops=dict(color = '#0000ff'),
+                            flierprops=dict(markeredgecolor = '#0000ff'),
+                            capprops=dict(color = '#0000ff'),
+                            whiskerprops=dict(color = '#0000ff'))
+        # fill with colors
+        for bp in [bp_p, bp_e, bp_fl]:
+            for patch in bp['boxes']:
+                patch.set_facecolor((1,1,1,0))
 
     # Plot fit
     x = np.linspace(temps[0],temps[-1],100)
     ax.plot(x, p_model(x), 'g', linewidth=2, label = 'Polynomial Fit')
     ax.plot(x, e_model(x), 'm', linewidth=2, label = 'Polynomial Fit')
-    pr_ax.plot(x, np.maximum(pr_model4(x-32.5),media_fl[-1]), '#0000ff', linewidth=2, label = 'Polynomial Fit')
-    # ax.vlines(critical_temp, 0, 1.4, lw = 1, colors='k', linestyles='dashed')
-    xticks = list(set(np.int16(pr_ax.get_xticks())))# + [critical_temp]
-    xticks_lb = ['29', '30', '31', '32', '33', '34', '35', '36']
-    xticks.sort()
-    # ax.set_xticks([])
-    pr_ax.set_xticks(xticks, labels=xticks_lb)
-    ax.set_ylabel(r'Bacteria Growth Rate $[\frac{1}{h}]$')
-    pr_ax.set_xlabel(r'Temperature $[^{\circ}C]$')
-    pr_ax.set_ylabel(r'Pyoverdine Production Rate $[\frac{1}{h}]$')
-    h,l = ax.get_legend_handles_labels()
-    h = [bp_p["boxes"][0], bp_e["boxes"][0], *h]
-    l = [r'P. putida, $\mu_{P,meas}$', r'E. coli, $\mu_{E,meas}$', *l]
-    ax.legend(h,l, loc='best')
-    h,l = pr_ax.get_legend_handles_labels()
-    h = [bp_fl["boxes"][0], *h]
-    l = [r'Pyoverdine, $\mu_{F,meas}$', *l]
-    pr_ax.legend(h,l, loc='best')
+    if symbol:
+        ax.set_xlabel('Temperature')
+        ax.set_ylabel('Growth Rate')
+        ax.set_xticks([])
+        ax.set_yticks([])
+    else:
+        pr_ax.plot(x, np.maximum(pr_model4(x-32.5),media_fl[-1]), '#0000ff', linewidth=2, label = 'Polynomial Fit')
+        xticks = list(set(np.int16(pr_ax.get_xticks())))# + [critical_temp]
+        xticks_lb = ['29', '30', '31', '32', '33', '34', '35', '36']
+        xticks.sort()
+        pr_ax.set_xticks(xticks, labels=xticks_lb)
+        y_ticks = [0,4e3,8e3]
+        y_ticks_lb = ['0', '4e3', '8e3']
+        pr_ax.set_yticks(y_ticks, labels=y_ticks_lb)
+        ax.set_ylabel(r'Growth Rate $[\frac{1}{h}]$')
+        pr_ax.set_xlabel(r'Temperature $[^{\circ}C]$')
+        pr_ax.set_ylabel(r'Production Rate $[\frac{1}{h}]$')
+        h,l = ax.get_legend_handles_labels()
+        h = [bp_p["boxes"][0], bp_e["boxes"][0], *h]
+        l = [r'P. putida, $\mu_{P,meas}$', r'E. coli, $\mu_{E,meas}$', *l]
+        ax.legend(h,l, loc='best')
+        h,l = pr_ax.get_legend_handles_labels()
+        h = [bp_fl["boxes"][0], *h]
+        l = [r'Pyoverdine, $\mu_{F,meas}$', *l]
+        pr_ax.legend(h,l, loc='best')
+        pr_ax.set_ylim([0,8000])
 
-    # ax.set_title("Bacteria Growth Rates")
     ax.set_ylim([0,1.3])
-    pr_ax.set_ylim([0,8000])
+    fig_gr.align_ylabels()
     fig_gr.tight_layout()
     # Save figures
     fig.suptitle(dataName)
@@ -225,6 +238,9 @@ if __name__ == "__main__":
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
     if paper:
-        fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresCDC/2_productionRates.pdf', transparent=True)
+        # fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresCDC/2_productionRates.pdf', transparent=True)
+        if symbol:
+            fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresPresentation/SymbolProductionRates.pdf', transparent=True)
+        fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresPresentation/ProductionRates.pdf', transparent=True)
     else:
         fig.savefig(results_dir + "/odGradient.pdf", transparent=True)

@@ -37,7 +37,7 @@ class Params:
 
             ### Parameters for the Kalman filter
             'od_init' : 0.25, # initial belief optical density
-            'e_rel_init' : 0.5, # initial relative belief of e. coli abundance
+            'e_rel_init' : 0.7, # initial relative belief of e. coli abundance
             # 'fp_init' : 0.056, # initial belief of fluorescence
             'fp_init' : 620, # initial belief of fluorescence
 
@@ -66,7 +66,7 @@ class Params:
 
             # Measurement noise standard deviation
             # 'sigma_od' : 1e-2,
-            'sigma_od_mod' : 1e-2,
+            'sigma_od_mod' : 5e-3,
             'sigma_od' : 3e-2,
             'sigma_fl' :2e1,
             'fl_temp2_prox_sigma_max': 1e2,
