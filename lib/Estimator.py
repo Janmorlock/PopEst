@@ -5,7 +5,7 @@ from lib.Model import CustModel
 
 class EKF:
     """
-    Extended Kalman Filter class used to estimate the states (abundance of p. putida, e.coli and fluorescent protein) of the system.
+    Extended Kalman Filter class used to estimate the states (abundance of P. putida, E.coli and fluorescent protein) of the system.
 
     Attributes
     ----------
@@ -18,13 +18,13 @@ class EKF:
         The covariance of the previous state estimate. The order of states
         is given by x = [e, p, fp, fl_ofs].
     dev_ind : int
-        The index of the reactor.
+        The index of the reactor, i.e. the integer in 'M0', 'M1', ...
     update : bool
         Whether to perform the measurement update step.
-    time_prev : float
-        The time of the previous measurement.
-    temp_prev : float
-        The temperature of the previous measurement.
+    e_ofs : float
+        The reactor specific offset for the fluorescence measurements.
+    e_fac : float
+        The reactor specific factor for the fluorescence measurements.
     """
     def __init__(self, model: CustModel = CustModel(), dev_ind: int = 0, update: bool = True):
         """
@@ -33,22 +33,27 @@ class EKF:
 
         Parameters
         ----------
-        model : CustModel
-            Model that is used to predict and update the state estimate.
-        dev_ind : int
-            The index of the reactor.
+        model : CustModel, optional
+            Model that is used to predict and update the state estimate. Default is CustModel().
+        dev_ind : int, optional
+            The index of the reactor. Default is 0.
         update : bool, optional
             Whether to perform the measurement update step. Default is True.
         """
         self.model = model
+        self.est = {  # Initial state
+            'e': model.parameters['od_init']*model.parameters['e_rel_init'],
+            'p': model.parameters['od_init']*(1-model.parameters['e_rel_init']),
+            'fp': model.parameters['fp_init']
+        }
+        self.var = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
         self.dev_ind = dev_ind
         self.update = update
-
-        self.cc_ind = 0
-        self.time_prev = -1
         self.e_ofs = 0
         self.e_fac = 1
 
+        # Helper variables
+        self.time_prev = -1
         self.time_lst = []
         self.gr_lst = []
         self.od_lst = []
@@ -63,18 +68,11 @@ class EKF:
 
         self.gr_avg = np.zeros(3)
 
-        self.est = {  # Initial state
-            'e': model.parameters['od_init']*model.parameters['e_rel_init'],
-            'p': model.parameters['od_init']*(1-model.parameters['e_rel_init']),
-            'fp': model.parameters['fp_init']
-        }
-        self.var = np.diag([model.parameters['sigma_e_init']**2, model.parameters['sigma_p_init']**2, model.parameters['sigma_fp_init']**2])
 
     def set_r_coeff(self, m_key):
-        # e_ofs_lst = list(self.model.parameters['e_ofs'].values())
-        # e_fac_lst = list(self.model.parameters['e_fac'].values())
-        # self.e_ofs = e_ofs_lst[list(self.model.parameters['e_ofs'].keys()).index(m0_key)]
-        # self.e_fac = e_fac_lst[list(self.model.parameters['e_fac'].keys()).index(m0_key)]
+        """
+        Set the reactor specific offset and factor for the fluorescence measurements.
+        """
         self.e_ofs = self.model.parameters['e_ofs'][m_key]
         self.e_fac = self.model.parameters['e_fac'][m_key]
 
@@ -89,14 +87,13 @@ class EKF:
         u : np.ndarray, dim: (num_inputs,)
             The next input u = [temp, dilute] to the system.
         y : np.ndarray, dim: (num_outputs,), optional
-            The measurement of the system. The order of outputs is given by y = [fl, od].
-            Will be ignored when update set to False.
+            The measurement of the system. The order of outputs is given by y = [od, fl].
+            Will be ignored when self.update set to False.
 
         Returns
         ----------
         None
         """
-
         # Prediction
         if self.time_prev >= 0: # Skip on first time step
             dt = time - self.time_prev
@@ -125,7 +122,6 @@ class EKF:
                     A_od = np.vstack(np.exp(self.gr_avg[1]*self.time_lst) - np.exp(self.gr_avg[0]*self.time_lst))
                     b_od = self.od_lst - self.od_lst[-1]*np.exp(self.gr_avg[0]*self.time_lst)
                     [self.p_est_od], [self.p_est_od_res] = np.linalg.lstsq(A_od, b_od, rcond = None)[0:2]
-                    # self.p_est_od_res = np.sqrt(self.p_est_od_res/len(self.od_lst))
                     self.p_est_od_res = self.p_est_od_res/(len(b_od)*np.var(b_od))
                     if self.p_est_od < 0:
                         self.p_est_od = 0
@@ -135,7 +131,6 @@ class EKF:
                     A_fl = np.vstack(self.gr_avg[2]/self.gr_avg[1]*(np.exp(self.gr_avg[1]*self.time_lst) - 1))
                     b_fl = self.fp_lst - self.fp_lst[-1]
                     [self.p_est_fl], [self.p_est_fl_res] = np.linalg.lstsq(A_fl, b_fl, rcond = None)[0:2]
-                    # self.p_est_fl_res = np.sqrt(self.p_est_fl_res/len(self.fp_lst))
                     self.p_est_fl_res = self.p_est_fl_res/(len(b_fl)*np.var(b_fl))
                     if self.p_est_fl < 0:
                         self.p_est_fl = 0

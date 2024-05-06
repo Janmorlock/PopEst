@@ -1,4 +1,8 @@
-from cProfile import label
+### This script estimates the production rate of fluorescent protein from the data in two different ways: brute-force fitting and explicit estimation.
+### The brute-force fitting is done by simulating the production rate for a range of values and comparing the results to the measured data.
+### The explicit estimation is done by fitting a model to the data and using it to estimate the production rate.
+### The script also plots the results of the production rate estimation and the simulation of the fluorescent protein production.
+
 import numpy as np
 import math
 import matplotlib.pyplot as plt
@@ -46,7 +50,7 @@ def simulateFlProtein(cb_hrs, fp_init, p_puti, dil, temp, parameters, temp_lst =
             
     return x
 
-### Explicit production rate estimation
+### Pyoverdine production rate estimation
 def get_prs(cbData: CbData, cbParam: CbDataParam, temp_lst: list, parameters: dict, e: list):
     
     temp_sp = []

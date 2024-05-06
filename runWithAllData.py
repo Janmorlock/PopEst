@@ -1,3 +1,5 @@
+### This script runs the EKF on multiple data sets and compares the estimation error with and without measurement update.
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
@@ -35,14 +37,17 @@ def highlight_cell(x,y, ax=None, **kwargs):
 
 if __name__ == "__main__":
     # SPECIFY DATA
-    data_names = ['081-1', '081-2', '081-3', '081-4']
-    # data_names = ['081-2', '081-3', '081-4']
+    plos = False
+    data_names = ['081-1', '081-2', '081-3', '081-4', '083-2', '083-5']
+    # data_names = ['081-2', '081-3']
     # data_names = ['081-1']
 
     len_d = len(data_names)
     cbParamAll = [CbDataParam(data_names[d]) for d in range(len_d)]
     n_exp = 0
     max_s = 0
+    cbParamAll[-1].sampcycle = [cbParamAll[-1].sampcycle[j][:-6] for j in range(len(cbParamAll[-1].sampcycle))]
+    cbParamAll[-1].cb_fc_ec = cbParamAll[-1].cb_fc_ec[:,:-6]
     for d in range(len_d):
         # cbParamAll[d].n_reactors = 2
         n_exp += cbParamAll[d].n_reactors
@@ -98,24 +103,33 @@ if __name__ == "__main__":
     matplotlib.rcParams['ps.fonttype'] = 42
     # Set font to Times New Roman
     plt.rcParams['font.family'] = 'Times New Roman'
-    plt.rcParams.update({'font.size': 11})
+    plt.rcParams.update({'font.size': 8})
+    plt.rcParams["mathtext.fontset"] = 'stix'
 
-    fig = plt.figure(figsize=(7, 4))
+    fig = plt.figure(figsize=(7.136, 2.779))
+    if not plos:
+        fig = plt.figure(figsize=(6, 3))
     extr = np.max(np.abs(sample_comp))
-    im = plt.imshow(sample_comp, cmap=red_green, aspect='auto', vmin=-extr, vmax=extr)
+    im = plt.imshow(sample_comp[:,1:], cmap=red_green, aspect='auto', vmin=-extr, vmax=extr)
     ax = plt.gca()
     for e in range(n_exp):
-        for s in range(max_s):
+        for s in range(1, max_s):
             if sample_comp[e,s] == 0.01:
-                highlight_cell(s,e,ax)
-    ax.set_xticks(np.arange(0,max_s), labels=np.arange(1,max_s+1))
-    ax.set_yticks(np.arange(0,n_exp+0), labels=np.arange(1,n_exp+1))
+                highlight_cell(s-1,e,ax)
+    ax.set_xticks(np.arange(0,max_s-1), labels=np.arange(1,max_s))
+    ax.set_yticks(np.arange(0,n_exp+0,2), labels=np.arange(1,n_exp+1,2))
     ax.set_xlabel('Flow Cytometer Sample')
     ax.set_ylabel('Experiment')
 
     cbar = fig.colorbar(im)
     # cbar.set_label(r'$| \hat{p}_{pred}-p_{fc} | - | \hat{p}-p_{fc} |$')
-    cbar.set_label('Change of EKF Estimation Error\nthrough Measurement Update [%]')
+    if plos:
+        cbar.set_label('Change of EKF Estimation Error\nthrough Measurement Update (%)')
+    else:
+        cbar.set_label('Change of EKF Estimation Error\nthrough Measurement Update [%]')
     fig.tight_layout()
 
-    fig.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresCDC/3_estComp.pdf', transparent=True)
+    if plos:
+        fig.savefig('/Users/janmorlock/Library/CloudStorage/GoogleDrive-janmorlock2001@gmail.com/.shortcut-targets-by-id/1YB52wg5TU4QbAKwShK0fWVAjnrvxlZvh/Pp Ec/Figures/Fig 4 - model and state estimation/EstComp.svg', transparent=True)
+    else:
+        fig.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresReport/3_CompPredEKF.pdf', transparent=True)

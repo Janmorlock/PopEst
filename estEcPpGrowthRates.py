@@ -1,3 +1,5 @@
+### Description: This script estimates the growth rates of E. coli and P. putida from the data of the Chi.Bio bioreactor.
+
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -17,8 +19,14 @@ if __name__ == "__main__":
     batch_size = 8
     cbParam = CbDataParam(dataName)
     results_dir = "Images/{}".format(dataName)
-    paper = True
     symbol = False
+    plos = False
+    if plos:
+        pp_color = '#FF9800'
+        ec_color = '#857171'
+    else:
+        pp_color = 'g'
+        ec_color = 'm'
 
     cbData = CbData(cbParam)
     temps = []
@@ -34,7 +42,8 @@ if __name__ == "__main__":
     matplotlib.rcParams['pdf.fonttype'] = 42
     matplotlib.rcParams['ps.fonttype'] = 42
     plt.rcParams['font.family'] = 'Times New Roman'
-    plt.rcParams.update({'font.size': 11})
+    plt.rcParams.update({'font.size': 8})
+    plt.rcParams["mathtext.fontset"] = 'stix'
     n_rows = math.ceil(cbParam.n_reactors/2)
     n_culumns = 2 if cbParam.n_reactors > 1 else 1
     fig, ax = plt.subplots(n_rows,2,sharex='all',sharey='all')
@@ -168,25 +177,30 @@ if __name__ == "__main__":
         fig_gr.set_figheight(1.5)
         fig_gr.set_figwidth(1.5)
     else:
-        plt.subplots_adjust(hspace=0.09) # 0.09
-        fig_gr.set_figheight(4) #6
-        fig_gr.set_figwidth(4) #7
+        if plos: 
+            fig_gr, (ax) = plt.subplots(1,1,sharex='all')
+            fig_gr.set_figheight(2.88)
+            fig_gr.set_figwidth(3.833)
+        else:
+            plt.subplots_adjust(hspace=0.09) # 0.09
+            fig_gr.set_figheight(6) #6
+            fig_gr.set_figwidth(7.5) #7
         # Plot gradients
-        bp_p = ax.boxplot(boxdata[0], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
-                    meanprops=dict(markerfacecolor = 'g', markeredgecolor = 'g'),
-                    boxprops=dict(color="g", alpha=0.5),
-                    medianprops=dict(color="g", alpha=0.5),
-                    flierprops=dict(markeredgecolor="g", alpha=0.5),
-                    capprops=dict(color="g", alpha=0.5),
-                    whiskerprops=dict(color="g", alpha=0.5))
-        bp_e = ax.boxplot(boxdata[1], positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
-                    meanprops=dict(markerfacecolor = 'm', markeredgecolor = 'm'),
-                    boxprops=dict(color="m", alpha=0.5),
-                    medianprops=dict(color="m", alpha=0.5),
-                    flierprops=dict(markeredgecolor="m", alpha=0.5),
-                    capprops=dict(color="m", alpha=0.5),
-                    whiskerprops=dict(color="m", alpha=0.5))
-        bp_fl = pr_ax.boxplot(prs, positions=temps, widths=0.4, showfliers=False, showmeans=True, patch_artist=True,
+        bp_p = ax.boxplot(boxdata[0], positions=temps, widths=0.4, showfliers=False, showmeans=False, patch_artist=True,
+                    meanprops=dict(markerfacecolor = pp_color, markeredgecolor = pp_color),
+                    boxprops=dict(color=pp_color, alpha=1),
+                    medianprops=dict(color=pp_color, alpha=1),
+                    flierprops=dict(markeredgecolor=pp_color, alpha=1),
+                    capprops=dict(color=pp_color, alpha=1),
+                    whiskerprops=dict(color=pp_color, alpha=1))
+        bp_e = ax.boxplot(boxdata[1], positions=temps, widths=0.4, showfliers=False, showmeans=False, patch_artist=True,
+                    meanprops=dict(markerfacecolor = ec_color, markeredgecolor = ec_color),
+                    boxprops=dict(color=ec_color, alpha=1),
+                    medianprops=dict(color=ec_color, alpha=1),
+                    flierprops=dict(markeredgecolor=ec_color, alpha=1),
+                    capprops=dict(color=ec_color, alpha=1),
+                    whiskerprops=dict(color=ec_color, alpha=1))
+        bp_fl = pr_ax.boxplot(prs, positions=temps, widths=0.4, showfliers=False, showmeans=False, patch_artist=True,
                             meanprops=dict(markerfacecolor = '#0000ff', markeredgecolor = '#0000ff'),
                             boxprops=dict(color = '#0000ff'),
                             medianprops=dict(color = '#0000ff'),
@@ -200,36 +214,46 @@ if __name__ == "__main__":
 
     # Plot fit
     x = np.linspace(temps[0],temps[-1],100)
-    ax.plot(x, p_model(x), 'g', linewidth=2, label = 'Polynomial Fit')
-    ax.plot(x, e_model(x), 'm', linewidth=2, label = 'Polynomial Fit')
+    ax.plot(x, p_model(x), color = pp_color, linewidth=2)
+    ax.plot(x, e_model(x), color = ec_color, linewidth=2)
+    ax.plot(temps, mean[0], '^', color = pp_color, markersize=5, label = 'Mean')
+    ax.plot(temps, mean[1], '^', color = ec_color, markersize=5, label = 'Mean')
     if symbol:
         ax.set_xlabel('Temperature')
         ax.set_ylabel('Growth Rate')
         ax.set_xticks([])
         ax.set_yticks([])
     else:
-        pr_ax.plot(x, np.maximum(pr_model4(x-32.5),media_fl[-1]), '#0000ff', linewidth=2, label = 'Polynomial Fit')
+        pr_ax.plot(x, np.maximum(pr_model4(x-32.5),media_fl[-1]), '#0000ff', linewidth=2,)
+        pr_ax.plot(temps, mean_fl, '^', color = '#0000ff', markersize=5, label = 'Mean')
         xticks = list(set(np.int16(pr_ax.get_xticks())))# + [critical_temp]
         xticks_lb = ['29', '30', '31', '32', '33', '34', '35', '36']
         xticks.sort()
         pr_ax.set_xticks(xticks, labels=xticks_lb)
-        y_ticks = [0,4e3,8e3]
-        y_ticks_lb = ['0', '4e3', '8e3']
-        pr_ax.set_yticks(y_ticks, labels=y_ticks_lb)
-        ax.set_ylabel(r'Growth Rate $[\frac{1}{h}]$')
-        pr_ax.set_xlabel(r'Temperature $[^{\circ}C]$')
-        pr_ax.set_ylabel(r'Production Rate $[\frac{1}{h}]$')
+        # y_ticks = [0,4e3,8e3]
+        # y_ticks_lb = ['0', '4e3', '8e3']
+        # pr_ax.set_yticks(y_ticks, labels=y_ticks_lb)
+        if plos:
+            ax.set_ylabel(r'Growth Rate ($\frac{1}{h}$)')
+            pr_ax.set_xlabel(r'Temperature ($\degree$C)')
+            pr_ax.set_ylabel(r'Production Rate ($\frac{1}{h}$)')
+            ax.set_xlabel(r'Temperature ($\degree$C)')
+            ax.set_xticks(xticks, labels=xticks_lb)
+        else:
+            ax.set_ylabel(r'Growth Rate [$\frac{1}{h}$]')
+            pr_ax.set_xlabel(r'Temperature [$\degree$C]')
+            pr_ax.set_ylabel(r'Production Rate [$\frac{1}{h}$]')
         h,l = ax.get_legend_handles_labels()
         h = [bp_p["boxes"][0], bp_e["boxes"][0], *h]
-        l = [r'P. putida, $\mu_{P,meas}$', r'E. coli, $\mu_{E,meas}$', *l]
-        ax.legend(h,l, loc='best')
+        l = [r'$\it{P. putida}$, $\mu_{P,meas}$', r'$\it{E. coli}$, $\mu_{E,meas}$', *l]
+        ax.legend(h,l, loc='lower left', ncol=2)
         h,l = pr_ax.get_legend_handles_labels()
         h = [bp_fl["boxes"][0], *h]
         l = [r'Pyoverdine, $\mu_{F,meas}$', *l]
-        pr_ax.legend(h,l, loc='best')
+        pr_ax.legend(h,l, loc='lower left', ncol = 2)
         pr_ax.set_ylim([0,8000])
 
-    ax.set_ylim([0,1.3])
+    ax.set_ylim([0,1.4])
     fig_gr.align_ylabels()
     fig_gr.tight_layout()
     # Save figures
@@ -237,10 +261,15 @@ if __name__ == "__main__":
     # fig.tight_layout()
     if not os.path.isdir(results_dir):
         os.makedirs(results_dir)
-    if paper:
-        # fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresCDC/2_productionRates.pdf', transparent=True)
-        if symbol:
+    # fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresCDC/2_productionRates.pdf', transparent=True)
+    if symbol:
+        if plos:
+            fig_gr.savefig('/Users/janmorlock/Library/CloudStorage/GoogleDrive-janmorlock2001@gmail.com/.shortcut-targets-by-id/1YB52wg5TU4QbAKwShK0fWVAjnrvxlZvh/Pp Ec/Figures/Fig 1 - overview/SymbolGrowthRates.svg', transparent=True)
+        else:
             fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresPresentation/SymbolProductionRates.pdf', transparent=True)
-        fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresPresentation/ProductionRates.pdf', transparent=True)
     else:
-        fig.savefig(results_dir + "/odGradient.pdf", transparent=True)
+        if plos:
+            # fig_gr.savefig('/Users/janmorlock/Library/CloudStorage/GoogleDrive-janmorlock2001@gmail.com/.shortcut-targets-by-id/1YB52wg5TU4QbAKwShK0fWVAjnrvxlZvh/Pp Ec/Figures/Fig 3 - biology is shit/productionRates.svg', transparent=True)
+            fig_gr.savefig('/Users/janmorlock/Library/CloudStorage/GoogleDrive-janmorlock2001@gmail.com/.shortcut-targets-by-id/1YB52wg5TU4QbAKwShK0fWVAjnrvxlZvh/Pp Ec/Figures/Fig 2 - integrating biology and hardware/growthRates.svg', transparent=True)
+        else:
+            fig_gr.savefig('/Users/janmorlock/Documents/Ausbildung/Master/MasterProject/FiguresReport/2_productionRates.pdf', transparent=True)

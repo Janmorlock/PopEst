@@ -1,30 +1,51 @@
 import numpy as np
 from typing import Tuple
-import math
 
 from config.params import Params
 
 # initialize
 class CustModel:
-    def __init__(self):
-        self.parameters = Params().default
-        self.dithered = False
+    """
+    Custom Model class used to predict and update the state estimate.
 
-        self.ts = self.parameters['ts']
-        self.ts_h = self.ts/3600
+    Attributes
+    ----------
+    parameters : dict
+        Dictionary containing the model parameters.
+    dithered : bool
+        Whether to use dithered dilution.
+    gr : np.ndarray, dim: (3,)
+        The steady state growth/production rates of the bacteria/Pyoverdine.
+    lp_fac : np.ndarray, dim: (2,)
+        The low pass filter factor for the bacteria growth rates.
+    gr_fp_delayed : np.ndarray, dim: (60*pr_fp_delay_min,)
+        Array containing the delayed production rate.
+    """
+    def __init__(self):
+        """
+        Initialize the model. Sets the variables and calculates the steady state
+        growth rates.
+
+        Parameters
+        ----------
+        None
+        """
+        self.parameters = Params().default
+
+        self.dithered = False
         self.gr = np.array([self.getSteadyStateGrowthRates(self.parameters['temp_pre_e'])[0],
                             self.getSteadyStateGrowthRates(self.parameters['temp_pre_p'])[1],
                             self.getSteadyStateGrowthRates(self.parameters['temp_pre_p'])[2]])
-        self.lp_fac = np.exp(-self.ts_h/np.array(self.parameters['lp_ht']))
-        gr_fp_delay_min = 30
-        self.gr_fp_k = self.ts_h *1.6 # 2
-        self.gr_fp_delayed = np.full(60*gr_fp_delay_min, self.gr[2], dtype=float)
+        self.lp_fac = np.exp(-self.parameters['ts']/3600/np.array(self.parameters['lp_ht']))
+        self.gr_fp_delayed = np.full(60*self.parameters['pr_fp_delay_min'], self.gr[2], dtype=float)
+
+        # Static helper variables
+        self.ts = self.parameters['ts']
+        self.ts_h = self.ts/3600
 
         self.Q = np.diag([self.parameters['sigma_e']**2, self.parameters['sigma_p']**2, self.parameters['sigma_fp']**2])
         self.Q_dil = np.diag([self.parameters['sigma_e_dil']**2, self.parameters['sigma_p_dil']**2, self.parameters['sigma_fp_dil']**2])
         self.Q_dil_dit = np.diag([self.parameters['sigma_e_dil_dit']**2, self.parameters['sigma_p_dil_dit']**2, self.parameters['sigma_fp_dil_dit']**2])
-        self.L = np.eye(3)
-        self.L_dil = np.eye(3)
 
         self.M = np.eye(5)
 
@@ -49,7 +70,8 @@ class CustModel:
             A_dil = np.array([[x_prev[1]/den-1, -x_prev[0]/den, 0],
                                     [-x_prev[1]/den, x_prev[0]/den-1, 0],
                                     [-x_prev[2]/den, -x_prev[2]/den, 1/(x_prev[0]+x_prev[1]) - 1]])
-            p_dil = A_dil @ p_prev @ A_dil.T + self.L_dil @ self.Q_dil @ self.L_dil.T
+            L_dil = np.diag(x_prev)
+            p_dil = A_dil @ p_prev @ A_dil.T + L_dil @ self.Q_dil @ L_dil.T
         return x_dil, p_dil
 
     def dilute_dithered(self, x_prev: np.ndarray, p_prev: np.ndarray):
@@ -66,7 +88,8 @@ class CustModel:
         A_dil = np.array([[1 - dil_r*x_prev[1]/od**2, dil_r*x_prev[0]/od**2, 0],
                             [dil_r*x_prev[1]/od**2, 1 - dil_r*x_prev[0]/od**2, 0],
                             [dil_r*x_prev[2]/od**2, dil_r*x_prev[2]/od**2, 1 - dil_r/od]])
-        p_dil = A_dil @ p_prev @ A_dil.T + self.L_dil @ self.Q_dil_dit @ self.L_dil.T
+        L_dil = np.diag(x_prev)
+        p_dil = A_dil @ p_prev @ A_dil.T + L_dil @ self.Q_dil_dit @ L_dil.T
         return x_dil, p_dil
     
     def predict(self, x_prev_dic: dict, p_prev: np.ndarray, u: np.ndarray, dt: float) -> Tuple[dict, np.ndarray]:
@@ -74,8 +97,26 @@ class CustModel:
         Prediction Step
 
         Dilutes if needed and predicts states and their variance after dt seconds.
-        To calculate the variance, the Jacobian of the system model is used.
-        """ 
+        To calculate the variance, the Jacobian of the system model is calculated.
+
+        Parameters
+        ----------
+        x_prev_dic : dict
+            Dictionary containing the previous states.
+        p_prev : np.ndarray
+            The previous state variance.
+        u : np.ndarray, dim: (2,)
+            The input to the system.
+        dt : float
+            The time in seconds to predict.
+        
+        Returns
+        ----------
+        dict
+            Dictionary containing the predicted states.
+        np.ndarray
+            The predicted state variance.
+        """
         x_prev = np.fromiter(x_prev_dic.values(),dtype=float)
         x_pred = x_prev.copy()
         p_pred = p_prev.copy()
@@ -96,13 +137,13 @@ class CustModel:
             A = np.array([[1 + self.ts_h*self.gr[0], 0, 0],
                       [0, 1 + self.ts_h*self.gr[1], 0],
                       [0, self.ts_h*self.gr[2], 1]])
-            self.L = np.diag([self.ts_h*x_pred[0], self.ts_h*x_pred[1], self.ts_h*x_pred[1]])
+            L = np.diag([self.ts_h*x_pred[0], self.ts_h*x_pred[1], self.ts_h*x_pred[1]])
 
             # Abundance after Ts seconds
             # Euler forward (not significantly less accurate than Runge - Kutta 4th order)
             x_pred = x_pred + self.ts_h*self.gr*np.array([x_pred[0], x_pred[1], x_pred[1]])
 
-            p_pred = A @ p_pred @ A.T + self.L @ self.Q @ self.L.T
+            p_pred = A @ p_pred @ A.T + L @ self.Q @ L.T
 
         return dict(zip(x_prev_dic, x_pred)), p_pred
     
@@ -111,6 +152,34 @@ class CustModel:
         Update Step
 
         Updates the states and their variance after a measurement y.
+
+        Parameters
+        ----------
+        x_pred_dic : dict
+            Dictionary containing the predicted states.
+        p_pred : np.ndarray
+            The predicted state variance.
+        y : np.ndarray, dim: (2,)
+            The measurement of the system.
+        p_est_od : float
+            The estimated P. putida abundance based on the optical density curvature. If zero, the estimate is not used.
+        p_est_fl : float
+            The estimated P. putida abundance based on the fluorescence curvature. If zero, the estimate is not used.
+        p_est_od_res : float
+            The residual of the least squares solution for the optical density curvature.
+        p_est_fl_res : float
+            The residual of the least squares solution for the fluorescence curvature.
+        gr_avg : np.ndarray, dim: (3,)
+            The average growth rates in the production phase.
+        temp : float
+            The current temperature of the system.
+
+        Returns
+        ----------
+        dict
+            Dictionary containing the updated states.
+        np.ndarray
+            The updated state variance.
         '''
         x_pred = np.fromiter(x_pred_dic.values(),dtype=float)
         od = x_pred[0] + x_pred[1]
@@ -169,7 +238,10 @@ class CustModel:
         # K = np.linalg.solve(H @ p_pred.T @ H.T + self.M @ self.parameters['r'].T @ self.M.T, H @ p_pred.T).T
         if m > 0:
             K = p_pred @ H.T @ np.linalg.inv(H @ p_pred @ H.T + self.M[:m,:m] @ R @ self.M[:m,:m].T)
-            xm += K @ (y_new - y_est)
+            if self.parameters['fl_update'] and not self.parameters['fl_gr_update']:
+                xm[:2] += (K @ (y_new - y_est))[:2]
+            else:
+                xm += (K @ (y_new - y_est))
             xm[np.isnan(xm)] = x_pred[np.isnan(xm)]
             Pm = (np.eye(3) - K @ H) @ p_pred
 
@@ -208,6 +280,6 @@ class CustModel:
         self.gr[0:2] = self.lp_fac*self.gr[0:2] + (1-self.lp_fac)*gr_ss[0:2]
 
         # Add damped oscillation to the production rate
-        self.gr[2] = self.gr[2] + self.gr_fp_k*(gr_ss[2] - self.gr_fp_delayed[0])
+        self.gr[2] = self.gr[2] + self.parameters['gr_fp_k']*(gr_ss[2] - self.gr_fp_delayed[0])
         self.gr[2] = max(self.parameters['min_gr_fp'],self.gr[2])
         self.gr_fp_delayed = np.append(self.gr_fp_delayed[1:],self.gr[2])
